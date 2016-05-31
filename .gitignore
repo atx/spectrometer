@@ -30,3 +30,7 @@
 
 # Debug files
 *.dSYM/
+
+.*
+_autosave*
+__pycache__
