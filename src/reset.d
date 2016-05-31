@@ -1,0 +1,1 @@
+reset.o: reset.c

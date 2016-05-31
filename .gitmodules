@@ -1,0 +1,4 @@
+[submodule "src/libopencm3"]
+	path = src/libopencm3
+	url = git@github.com:atalax/libopencm3.git
+	branch = f3-usb

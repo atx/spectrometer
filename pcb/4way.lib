@@ -1,0 +1,23 @@
+EESchema-LIBRARY Version 2.3
+#encoding utf-8
+#
+# 4WAY
+#
+DEF 4WAY J 0 40 Y Y 1 F N
+F0 "J" 0 -125 39 H V C CNN
+F1 "4WAY" 0 125 39 H V C CNN
+F2 "" -25 -100 39 H V C CNN
+F3 "" -25 -100 39 H V C CNN
+DRAW
+S -75 -25 -25 -75 0 1 0 F
+S -75 75 -25 25 0 1 0 F
+S 25 -25 75 -75 0 1 0 F
+S 25 75 75 25 0 1 0 F
+X ~ 1 -125 50 51 R 20 39 1 1 I
+X ~ 2 -125 -50 51 R 20 39 1 1 I
+X ~ 3 125 -50 51 L 20 39 1 1 I
+X ~ 4 125 50 51 L 20 39 1 1 I
+ENDDRAW
+ENDDEF
+#
+#End Library

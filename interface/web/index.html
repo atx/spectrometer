@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Spectrometer</title>
+<!--
+<script src="jquery-2.1.4.min.js"></script>
+<script src="d3.min.js"></script>
+<script src="index.js"></script>
+-->
+<script id="js-loader">
+window.onload = function() {
+	var toload = ["index.js", "d3.min.js", "jquery-2.1.4.min.js"];
+	var loadall = function() {
+		if (toload.length == 0) {
+			var ldr = document.getElementById("js-loader");
+			ldr.parentElement.removeChild(ldr);
+			return;
+		}
+		var fname = toload.pop();
+		var req = new XMLHttpRequest();
+		req.onreadystatechange = function() {
+			if (req.readyState == 4 && req.status == 200) {
+				var scr = document.createElement("script");
+				scr.innerHTML = req.responseText;
+				document.head.appendChild(scr);
+				loadall();
+			}
+		};
+		req.open("GET", fname);
+		req.send();
+	}
+	loadall();
+};
+</script>
+<style>
+html {
+	width: 100%;
+	height: 99.5%;
+	background-color: #111;
+	margin: 0;
+	padding: 0;
+	color: #eee;
+}
+
+#control {
+	height: 30px;
+	display: flex;
+	padding-left: 40px;
+	align-items: center;
+	background-color: #090909;
+	border-bottom: #555 1px solid;
+	line-height: 100%;
+}
+
+#control #cpm {
+	width: 14eX;
+	text-align: right;
+}
+
+#control * {
+	margin-left: 10px;
+}
+
+#control select {
+	margin-left: 4px;
+}
+
+svg {
+	padding: 25px 0px 15px 40px;
+	height: calc(100% - 25px - 15px - 30px);
+	width: calc(100% - 40px);
+	background-color: #111;
+}
+
+svg .pane {
+	cursor: move;
+	fill: none;
+	pointer-events: all;
+}
+
+svg rect {
+	shape-rendering: crispEdges;
+}
+
+svg .axis line, .axis path {
+	fill: none;
+	stroke: #444;
+	stroke-dasharray: 2, 2;
+	shape-rendering: crispEdges;
+}
+
+svg .axis .domaimn {
+	display: none;
+}
+
+svg .axis text {
+	fill: #eee;
+}
+
+svg .bar {
+	fill: dodgerblue;
+}
+</style>
+</head>
+<body style="width: 100%; height: 100%; margin: 0; min-height: 100%">
+<div id="control">
+	<div id="timer">00:00:00</div>
+	<div id="cpm">-</div>
+	<button id="download">Download</button>
+	<button id="csv">.txt</button>
+	<button id="clear">Clear</button>
+	<label id="binsize-label" for="binsize">Bin size:</label>
+	<select id="binsize">
+		<option selected>1</option>
+		<option>2</option>
+		<option>4</option>
+		<option>8</option>
+		<option>16</option>
+	</select>
+	<label for="threshold">Threshold </label>
+	<input id="threshold" type="number" min="0" max="4096" value="7">
+</div>
+</body>
+</html>

@@ -1,0 +1,4 @@
+(fp_lib_table
+  (lib (name tinkerforge)(type Github)(uri https://github.com/Tinkerforge/kicad-libraries)(options "")(descr ""))
+  (lib (name footprints)(type KiCad)(uri ${KIPRJMOD}/footprints.pretty)(options "")(descr ""))
+)
