@@ -24,114 +24,14 @@
 import argparse
 import asyncio
 import base64
-import concurrent
 import datetime
 import glob
-import http
 import json
 import os
-import random
-import socketserver
 import sys
-import threading
 import time
-import traceback
-import weakref
-import webbrowser
 from aiohttp import web
-from http import server
-from spectrometer import *
-
-parser = argparse.ArgumentParser(
-    prog = "Spectrometer GUI"
-)
-parser.add_argument(
-    "-s", "--serial",
-    help = "Serial port to use",
-    default = "/dev/ttyACM*"
-)
-parser.add_argument(
-    "-t", "--type",
-    help = "Spectrometer type",
-    choices = ["dummy", "serial", "sipos"],
-    default = "serial"
-)
-parser.add_argument(
-    "-b", "--bind",
-    help = "Address to bind to",
-    default = "127.0.0.1"
-)
-parser.add_argument(
-    "-l", "--log",
-    help = "Log timestamped events into a file",
-    default = None
-)
-
-args = parser.parse_args()
-
-THRESHOLD = 100
-
-def spectrometer_connect():
-    if args.type == "dummy":
-        spect = DummySpectrometer(period = 0.001, chans = 4096)
-    elif args.type == "serial":
-        spect = SerSpect(glob.glob(args.serial)[0])
-        spect.set_prop(spect.PROP_THRESH, THRESHOLD)
-        assert spect.get_prop(spect.PROP_THRESH) == THRESHOLD
-    elif args.type == "sipos":
-        spect = SIPOSSpectrometer(glob.glob(args.serial)[0])
-    spect.start()
-    return spect
-
-spectrometer = spectrometer_connect()
-
-csrf_token = base64.b64encode(os.urandom(20)).decode()
-
-# WebSockets are not constrained by Same-Origin policy, this gets sent by the
-# client to configure and authenticate itself.
-metadata_json = json.dumps({"csrf": csrf_token,
-                            "channels": spectrometer.channels,
-                            "driver": spectrometer.__class__.__name__,
-                            "fw_version": spectrometer.fw_version}
-                           ).encode()
-
-class Master:
-
-    def __init__(self, spectrometer, logfile = None):
-        self.spectrometer = spectrometer
-        self.clients = []
-        self.history = [10] * spectrometer.channels
-        self.since = time.time()
-        self.logfile = logfile
-
-    def clear(self):
-        self.history = [0] * self.spectrometer.channels
-        self.since = time.time()
-        [c.send_history(self.history, self.since) for c in self.clients]
-
-    async def spectrometer_loop(self):
-        self.clear()
-        # Leak here
-        fil = open(self.logfile, "w+") if self.logfile else None
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as e:
-            while True:
-                v = await asyncio.get_event_loop().run_in_executor(e, self.spectrometer.next_event)
-                if v >= len(self.history):
-                    continue
-                self.history[v] += 1
-                if fil:
-                    fil.write("%s %d\n" % (datetime.datetime.now().isoformat()[:-7], v))
-                    fil.flush()
-                self.broadcast_event(v)
-
-    def broadcast(self, jsn):
-        [c.send(jsn) for c in self.clients]
-
-    def broadcast_history(self, hist, since):
-        [c.send_history(hist, since) for c in self.clients]
-
-    def broadcast_event(self, val):
-        [c.send_event(val) for c in self.clients]
+from spectrometer import DummySpectrometer, SIPOSSpectrometer, SerSpect
 
 
 class Client:
@@ -151,7 +51,7 @@ class Client:
 
     async def run(self):
         js = json.loads(await self.ws.receive_str())
-        if csrf_token != js["csrf"]:
+        if self.master.csrf_token != js["csrf"]:
             # EVIL
             print("Invalid CSRF token detected!")
             return
@@ -163,43 +63,143 @@ class Client:
                 js = json.loads(msg.data)
                 if js["command"] == "clear":
                     self.master.clear()
+                elif js["command"] == "set":
+                    pass
             elif msg.tp == web.MsgType.close:
                 break
 
-master = Master(spectrometer, logfile = args.log)
+class WebApp(web.Application):
 
-async def handle_metadata(req):
-    return web.Response(body = metadata_json, content_type = "application/json")
+    def __init__(self, spectrometer, logfile = None):
+        super(WebApp, self).__init__()
 
-async def handle_data(req):
-    ret = "-_-\n---\n"
-    for x in master.history:
-        ret += ("%d\n" % x)
-    return web.Response(body = ret.encode(), content_type = "text/plain")
+        self.spectrometer = spectrometer
+        self.logfile = logfile
+        self.clients = []
+        self.history = [0] * self.spectrometer.channels
+        self.since = time.time()
 
-async def handle_index(req):
-    return web.HTTPFound("/index.html")
+        self.csrf_token = base64.b64encode(os.urandom(20)).decode()
 
-async def handle_ws(req):
-    ws = web.WebSocketResponse()
-    await ws.prepare(req)
+        # WebSockets are not constrained by Same-Origin policy, this gets sent by the
+        # client to configure and authenticate itself.
+        metadata = {"csrf": self.csrf_token,
+                    "channels": self.spectrometer.channels,
+                    "driver": self.spectrometer.__class__.__name__,
+                    "fw_version": self.spectrometer.fw_version}
 
-    cl = Client(ws, master)
-    master.clients.append(cl)
+        self.metadata_json = json.dumps(metadata).encode()
 
-    try:
-        await cl.run()
-    finally:
-        master.clients.remove(cl)
-    return ws
+        self.router.add_route("GET", "/metadata.json", self.handle_metadata)
+        self.router.add_route("GET", "/data.txt", self.handle_data)
+        self.router.add_route("GET", "/", self.handle_index)
+        self.router.add_route("GET", "/ws", self.handle_ws)
+        self.router.add_static("/", "../web")
+
+    async def handle_metadata(self, req):
+        return web.Response(body = self.metadata_json, content_type = "application/json")
+
+    async def handle_data(self, req):
+        ret = "-_-\n---\n"
+        for x in self.history:
+            ret += ("%d\n" % x)
+        return web.Response(body = ret.encode(), content_type = "text/plain")
+
+    async def handle_index(self, req):
+        return web.HTTPFound("/index.html")
+
+    async def handle_ws(self, req):
+        ws = web.WebSocketResponse()
+        await ws.prepare(req)
+
+        cl = Client(ws, self)
+        self.clients.append(cl)
+
+        try:
+            await cl.run()
+        finally:
+            self.clients.remove(cl)
+        return ws
+
+    def clear(self):
+        self.history = [0] * self.spectrometer.channels
+        self.since = time.time()
+        [c.send_history(self.history, self.since) for c in self.clients]
+
+    async def spectrometer_loop(self):
+        self.clear()
+        self.spectrometer.start()
+        # Leak here
+        fil = open(self.logfile, "w+") if self.logfile else None
+        async for v in self.spectrometer:
+            if v >= len(self.history): # TODO: Figure out why this is here...
+                continue
+            self.history[v] += 1
+            self.broadcast_event(v)
+            if fil:
+                fil.write("%s %d\n" % (datetime.datetime.now().isoformat()[:-7], v))
+                fil.flush()
+
+    def broadcast(self, jsn):
+        for c in self.clients:
+            c.send(jsn)
+
+    def broadcast_history(self, hist, since):
+        for c in self.clients:
+            c.send_history(hist, since)
+
+    def broadcast_event(self, val):
+        for c in self.clients:
+            c.send_event(val)
+
+async def main():
+
+    parser = argparse.ArgumentParser(
+        prog = "Spectrometer GUI"
+    )
+    parser.add_argument(
+        "-s", "--serial",
+        help = "Serial port to use",
+        default = "/dev/ttyACM*"
+    )
+    parser.add_argument(
+        "-t", "--type",
+        help = "Spectrometer type",
+        choices = ["dummy", "serial", "sipos"],
+        default = "serial"
+    )
+    parser.add_argument(
+        "-b", "--bind",
+        help = "Address to bind to",
+        default = "127.0.0.1"
+    )
+    parser.add_argument(
+        "-l", "--log",
+        help = "Log timestamped events into a file",
+        default = None
+    )
+
+    args = parser.parse_args()
+
+    THRESHOLD = 100
+
+    if args.type == "dummy":
+        spectrometer = DummySpectrometer(period = 0.001, chans = 4096)
+    elif args.type == "serial":
+        spectrometer = await SerSpect.connect(glob.glob(args.serial)[0])
+        spectrometer.set_prop(SerSpect.PROP_THRESH, THRESHOLD)
+        spectrometer.set_prop(SerSpect.PROP_AMP, 0)
+        spectrometer.set_prop(SerSpect.PROP_BIAS, 1)
+        assert await spectrometer.get_prop(SerSpect.PROP_THRESH) == THRESHOLD
+    elif args.type == "sipos":
+        spectrometer = await SIPOSSpectrometer.connect(glob.glob(args.serial)[0])
+
+    app = WebApp(spectrometer, logfile = args.log)
+
+    asyncio.ensure_future(app.spectrometer_loop())
+
+    return lambda: web.run_app(app, port = 4000)
 
 if __name__ == "__main__":
-    app = web.Application()
-    app.router.add_route("GET", "/metadata.json", handle_metadata)
-    app.router.add_route("GET", "/data.txt", handle_data)
-    app.router.add_route("GET", "/", handle_index)
-    app.router.add_route("GET", "/ws", handle_ws)
-    app.router.add_static("/", "../web")
-
-    asyncio.ensure_future(master.spectrometer_loop())
-    web.run_app(app, port = 4000)
+    fn = asyncio.get_event_loop().run_until_complete(main())
+    fn()

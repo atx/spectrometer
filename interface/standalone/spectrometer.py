@@ -20,11 +20,13 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import asyncio
 import datetime
 import functools
 import operator
 import random
 import serial
+import serial.aio
 import struct
 import time
 
@@ -32,6 +34,7 @@ class Spectrometer:
 
     def __init__(self, channels):
         self.channels = channels
+        self.fw_version = "NONE"
 
     def start(self):
         pass
@@ -39,17 +42,21 @@ class Spectrometer:
     def end(self):
         pass
 
-    def __iter__(self):
-        return self
-
-    def next_event(self):
+    async def next_event(self):
         raise NotImplementedError
 
-    def __next__(self):
-        return self.next_event()
+    def set_prop(self, prop, val):
+        raise NotImplementedError
 
-    def flush(self):
-        pass
+    async def get_prop(self, prop):
+        raise NotImplementedError
+
+    async def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        return await self.next_event()
+
 
 class DummySpectrometer(Spectrometer):
 
@@ -60,28 +67,63 @@ class DummySpectrometer(Spectrometer):
         self.chans = chans
         self.fw_version = "1.0"
 
-    def next_event(self):
+    async def next_event(self):
         dt = time.time() - self._last
         if dt < self.period:
-            time.sleep(self.period)
+            await asyncio.sleep(self.period - dt)
         self._last += self.period
         return int(random.gauss(200, 10)) if random.random() < 0.1 else int(random.gauss(2000, 300))
 
-    def flush(self):
-        self._last = time.time()
 
-class SIPOSSpectrometer(Spectrometer):
+class AsyncSerialSpectrometer(Spectrometer, asyncio.Protocol):
+
+    def __init__(self, channels):
+        super(AsyncSerialSpectrometer, self).__init__(channels = channels)
+        self._initsem = asyncio.Semaphore(value = 0)
+        self._recvqueue = asyncio.Queue()
+
+    def connection_made(self, transport):
+        self._transport = transport
+        self._initsem.release()
+
+    def data_received(self, data):
+        for x in range(len(data)):
+            self._recvqueue.put_nowait(data[x:x + 1])
+
+    async def recv(self, nbytes = 1):
+        ret = b""
+        for _ in range(nbytes):
+            ret += await self._recvqueue.get()
+        return ret
+
+    @classmethod
+    async def connect(cls, port):
+        transport, spect = await serial.aio.create_serial_connection(
+                                asyncio.get_event_loop(), cls, port, cls._initbaud)
+        await spect._initsem.acquire()
+        await spect._ainit()
+        return spect
+
+    async def _ainit(self):
+        pass
+
+    def flush(self):
+        self._recvqueue = asyncio.Queue()
+
+    def close(self):
+        self._transport.close()
+
+
+class SIPOSSpectrometer(AsyncSerialSpectrometer):
+
+    _initbaud = 500000
 
     def __init__(self, sername):
         super(SIPOSSpectrometer, self).__init__(channels = 4096)
-        self._ser = serial.Serial(sername, 500000)
-        self.fw_version = "0.0"
 
-    def next_event(self):
-        at = self._ser.read(2)
+    async def next_event(self):
+        at = await self.recv(2)
         return (((at[0] & 0x3f) << 6) | (at[1] & 0x7f)) ^ 0xfff
-
-    __next__ = next_event
 
 
 class SerSpectException(Exception):
@@ -89,7 +131,7 @@ class SerSpectException(Exception):
     def __init__(self, errorcode):
         self.errorcode = errorcode
 
-class SerSpect(Spectrometer):
+class SerSpect(AsyncSerialSpectrometer):
 
     # Host->Device
     PACK_NOP = 0x01
@@ -125,17 +167,22 @@ class SerSpect(Spectrometer):
         PROP_AMP: 1,
     }
 
-    def __init__(self, sername):
+    _initbaud = 115200 # Does not matter really
+
+    def __init__(self):
         super(SerSpect, self).__init__(channels = 4096)
-        self._packqueue = []
-        self._ser = serial.Serial(sername, 115200)
-        self._ser.write([SerSpect.PACK_NOP] * 100)
-        self.end()
+        self.event_loop = asyncio.get_event_loop()
+        self._packqueues = [asyncio.Queue() for _ in range(256)]
+
+        self._transport = None
+
+    async def _ainit(self):
+        self._transport.write([SerSpect.PACK_NOP] * 100) # Flush the device buffer if it has not been flushed yet
+        self.flush()
         self.set_prop(SerSpect.PROP_BIAS, 0)
         self.set_prop(SerSpect.PROP_AMP, 0)
-        self.flush()
 
-        ver = self.get_prop(SerSpect.PROP_FW)
+        ver = await self.get_prop(SerSpect.PROP_FW)
         self.fw_version = "%d.%d" % (ver >> 8, ver & 0xff)
 
     @staticmethod
@@ -147,17 +194,9 @@ class SerSpect(Spectrometer):
         return functools.reduce(operator.add,
                                 map(lambda i, v: v << (i * 8), *zip(*enumerate(bytss))))
 
-    @property
-    def timeout(self):
-        return self._ser._timeout
-
-    @timeout.setter
-    def timeout(self, v):
-        self._ser.timeout = v
-
-    def ping(self):
+    async def ping(self):
         self.send_packet(SerSpect.PACK_PING)
-        self.recv_packet_queued(SerSpect.PACK_PONG)
+        await self.recv_packet_queued(SerSpect.PACK_PONG)
 
     def start(self):
         self.send_packet(SerSpect.PACK_START)
@@ -171,58 +210,47 @@ class SerSpect(Spectrometer):
                          SerSpect._encode_lendian(val,
                                                   SerSpect.PROP_LENGTH_MAP[prop]))
 
-    def get_prop(self, prop):
+    async def get_prop(self, prop):
         self.send_packet(SerSpect.PACK_GET, prop)
-        return SerSpect._decode_lendian(
-                    self.recv_packet_queued(SerSpect.PACK_GETRESP)[2:])
+        pack = await self.recv_packet_queued(SerSpect.PACK_GETRESP)
+        return SerSpect._decode_lendian(pack[2:])
 
-    def recv_packet_queued(self, typ):
-        for p in self._packqueue:
-            if p[0] == typ:
-                self._packqueue.remove(p)
-                return p
-        while True:
-            p = self.recv_packet()
-            if p[0] == typ:
-                return p
-            self._packqueue.append(p)
+    async def recv_packet_queued(self, typ):
+        pq = self._packqueues[typ]
+        while pq.empty():
+            pack = await self.recv_packet()
+            self._packqueues[pack[0]].put_nowait(pack)
+        return await pq.get()
 
     def send_packet(self, *args):
-        self._ser.write(
+        self._transport.write(
             functools.reduce(
                     operator.add,
                     map(bytes, [[x] if isinstance(x, int) else x for x in args])))
 
-    def recv_packet(self):
+    async def recv_packet(self):
         while True:
-            pack = self._ser.read(1)
+            pack = await self.recv(1)
             typ = pack[0]
             if typ == SerSpect.PACK_GETRESP:
-                pack += self._ser.read(1)
+                pack += await self.recv(1)
                 propid = pack[-1]
-                return pack + self._ser.read(SerSpect.PROP_LENGTH_MAP[propid])
+                return pack + (await self.recv(SerSpect.PROP_LENGTH_MAP[propid]))
             elif typ == SerSpect.PACK_WAVE:
-                pack += self._ser.read(1)
-                return pack + self._ser.read(pack[-1] * 2)
+                pack += await self.recv(1)
+                return pack + (await self.recv(pack[-1] * 2))
             elif typ in SerSpect.PACK_LENGTH_MAP:
                 ln = SerSpect.PACK_LENGTH_MAP[typ]
-                return pack + (self._ser.read(ln - 1) if ln > 1 else b"")
+                return pack + ((await self.recv(ln - 1)) if ln > 1 else b"")
             # Drop the byte
 
-    def next_event(self):
-        p = self.recv_packet_queued(SerSpect.PACK_EVENT)
+    async def next_event(self):
+        p = await self.recv_packet_queued(SerSpect.PACK_EVENT)
         return self._decode_lendian(p[1:])
 
-    def next_wave(self):
-        p = self.recv_packet_queued(SerSpect.PACK_WAVE)
+    async def next_wave(self):
+        p = await self.recv_packet_queued(SerSpect.PACK_WAVE)
         return struct.unpack(">%dH" % p[1], p[2:])
-
-    def flush(self):
-        self._packqueue.clear()
-        self._ser.flush()
-
-    def close(self):
-        self._ser.close()
 
 
 class HistFile:
