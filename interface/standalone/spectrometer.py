@@ -173,6 +173,7 @@ class SerSpect(AsyncSerialSpectrometer):
         super(SerSpect, self).__init__(channels = 4096)
         self.event_loop = asyncio.get_event_loop()
         self._packqueues = [asyncio.Queue() for _ in range(256)]
+        self._packlock = asyncio.Lock()
 
         self._transport = None
 
@@ -229,20 +230,21 @@ class SerSpect(AsyncSerialSpectrometer):
                     map(bytes, [[x] if isinstance(x, int) else x for x in args])))
 
     async def recv_packet(self):
-        while True:
-            pack = await self.recv(1)
-            typ = pack[0]
-            if typ == SerSpect.PACK_GETRESP:
-                pack += await self.recv(1)
-                propid = pack[-1]
-                return pack + (await self.recv(SerSpect.PROP_LENGTH_MAP[propid]))
-            elif typ == SerSpect.PACK_WAVE:
-                pack += await self.recv(1)
-                return pack + (await self.recv(pack[-1] * 2))
-            elif typ in SerSpect.PACK_LENGTH_MAP:
-                ln = SerSpect.PACK_LENGTH_MAP[typ]
-                return pack + ((await self.recv(ln - 1)) if ln > 1 else b"")
-            # Drop the byte
+        async with self._packlock:
+            while True:
+                pack = await self.recv(1)
+                typ = pack[0]
+                if typ == SerSpect.PACK_GETRESP:
+                    pack += await self.recv(1)
+                    propid = pack[-1]
+                    return pack + (await self.recv(SerSpect.PROP_LENGTH_MAP[propid]))
+                elif typ == SerSpect.PACK_WAVE:
+                    pack += await self.recv(1)
+                    return pack + (await self.recv(pack[-1] * 2))
+                elif typ in SerSpect.PACK_LENGTH_MAP:
+                    ln = SerSpect.PACK_LENGTH_MAP[typ]
+                    return pack + ((await self.recv(ln - 1)) if ln > 1 else b"")
+                # Drop the byte
 
     async def next_event(self):
         p = await self.recv_packet_queued(SerSpect.PACK_EVENT)
