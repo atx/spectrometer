@@ -174,17 +174,24 @@ class SerSpect(AsyncSerialSpectrometer):
         self.event_loop = asyncio.get_event_loop()
         self._packqueues = [asyncio.Queue() for _ in range(256)]
         self._packlock = asyncio.Lock()
+        self._proplock = asyncio.Lock()
 
         self._transport = None
 
     async def _ainit(self):
         self._transport.write([SerSpect.PACK_NOP] * 100) # Flush the device buffer if it has not been flushed yet
         self.flush()
+        asyncio.ensure_future(self._recv_loop())
         self.set_prop(SerSpect.PROP_BIAS, 0)
         self.set_prop(SerSpect.PROP_AMP, 0)
 
         ver = await self.get_prop(SerSpect.PROP_FW)
         self.fw_version = "%d.%d" % (ver >> 8, ver & 0xff)
+
+    async def _recv_loop(self):
+        while True:
+            pack = await self.recv_packet()
+            self._packqueues[pack[0]].put_nowait(pack)
 
     @staticmethod
     def _encode_lendian(val, ln):
@@ -212,16 +219,13 @@ class SerSpect(AsyncSerialSpectrometer):
                                                   SerSpect.PROP_LENGTH_MAP[prop]))
 
     async def get_prop(self, prop):
-        self.send_packet(SerSpect.PACK_GET, prop)
-        pack = await self.recv_packet_queued(SerSpect.PACK_GETRESP)
-        return SerSpect._decode_lendian(pack[2:])
+        async with self._proplock:
+            self.send_packet(SerSpect.PACK_GET, prop)
+            pack = await self.recv_packet_queued(SerSpect.PACK_GETRESP)
+            return SerSpect._decode_lendian(pack[2:])
 
     async def recv_packet_queued(self, typ):
-        pq = self._packqueues[typ]
-        while pq.empty():
-            pack = await self.recv_packet()
-            self._packqueues[pack[0]].put_nowait(pack)
-        return await pq.get()
+        return await self._packqueues[typ].get()
 
     def send_packet(self, *args):
         self._transport.write(
