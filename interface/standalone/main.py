@@ -49,6 +49,12 @@ class Client:
     def send_event(self, val):
         self.send({"v": val})
 
+    async def send_configprops(self):
+        dpr = {}
+        for p in self.master.spectrometer.configprops:
+            dpr[p.id] = await self.master.spectrometer.get_prop(p.id)
+        self.send({"props": dpr})
+
     async def run(self):
         js = json.loads(await self.ws.receive_str())
         if self.master.csrf_token != js["csrf"]:
@@ -57,6 +63,7 @@ class Client:
             return
 
         self.send_history(self.master.history, self.master.since)
+        await self.send_configprops()
 
         async for msg in self.ws:
             if msg.tp == web.MsgType.text:
@@ -64,7 +71,15 @@ class Client:
                 if js["command"] == "clear":
                     self.master.clear()
                 elif js["command"] == "set":
-                    pass
+                    cp = None
+                    for x in self.master.spectrometer.configprops:
+                        if x.id == js["id"]:
+                            cp = x
+                            break
+                    if cp is None or not (cp.fr <= js["value"] <= cp.to):
+                        continue
+                    self.master.spectrometer.set_prop(js["id"], js["value"])
+                    await self.master.broadcast_configprops()
             elif msg.tp == web.MsgType.close:
                 break
 
@@ -86,7 +101,11 @@ class WebApp(web.Application):
         metadata = {"csrf": self.csrf_token,
                     "channels": self.spectrometer.channels,
                     "driver": self.spectrometer.__class__.__name__,
-                    "fw_version": self.spectrometer.fw_version}
+                    "fw_version": self.spectrometer.fw_version,
+                    "configprops": [{"id": c.id,
+                                     "name": c.name,
+                                     "from": c.fr,
+                                     "to": c.to} for c in self.spectrometer.configprops]}
 
         self.metadata_json = json.dumps(metadata).encode()
 
@@ -151,6 +170,15 @@ class WebApp(web.Application):
     def broadcast_event(self, val):
         for c in self.clients:
             c.send_event(val)
+
+    async def broadcast_configprops(self):
+        # I so don't want to know what happens if more clients update their
+        # config at once...
+        dpr = {}
+        for p in self.spectrometer.configprops:
+            dpr[p.id] = await self.spectrometer.get_prop(p.id)
+        for c in self.clients:
+            c.send({"props": dpr})
 
 async def main():
 

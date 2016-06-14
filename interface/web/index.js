@@ -29,6 +29,7 @@ state = {
 	finished: null,
 	threshold: 10,
 	ws: null,
+	cfgpropwid: {}
 }
 
 function clamp(v, mi, mx) {
@@ -228,6 +229,23 @@ function init() {
 }
 
 function initRemote(data) {
+	data["configprops"].forEach(function (c, i) {
+		var id = "config-" + c.id;
+		$("<label for=" + id + ">" + c.name + "</label>").appendTo("#control");
+		if (c.from == 0 && c.to == 1) {
+			var ctl = $("<input type=\"checkbox\" id=\"" + id + "\"></input>").appendTo("#control");
+		} else {
+			var ctl = $("<input type=\"number\" id=\"" + id + "\" min=" + c.from + " max=" + c.to + ">")
+				.appendTo("#control");
+		}
+		ctl.change(function() {
+			state.ws.send(JSON.stringify({"command": "set", "id": c.id,
+											"value": this.value == "on" ?
+														(this.checked ? 1 : 0) :
+														parseInt(this.value)}));
+		})
+		state.cfgpropwid[c.id] = ctl;
+	});
 	$("#download").click(function () {
 		var stored =
 			$("<div id=\"stored\"></div>")
@@ -265,6 +283,18 @@ function initRemote(data) {
 			console.log("History received!");
 			state.histogram = d.h;
 			state.since = d.since;
+		} else if (d.props) {
+			console.log("Configuration properties received!");
+			for (var k in d.props) {
+				var el = state.cfgpropwid[k];
+				if (el.prop("type") == "checkbox") {
+					el.prop("checked", !!d.props[k]);
+				} else {
+					el.val(d.props[k]);
+				}
+			}
+		} else {
+			console.log("WTF? " + d);
 		}
 	}
 }

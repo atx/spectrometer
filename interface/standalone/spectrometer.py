@@ -30,10 +30,19 @@ import serial.aio
 import struct
 import time
 
+class ConfigProp:
+
+    def __init__(self, spect, id, name, fr, to):
+        self.id = id
+        self.name = name
+        self.fr = fr
+        self.to = to
+
 class Spectrometer:
 
     def __init__(self, channels):
         self.channels = channels
+        self.configprops = []
         self.fw_version = "NONE"
 
     def start(self):
@@ -179,6 +188,13 @@ class SerSpect(AsyncSerialSpectrometer):
         self._proplock = asyncio.Lock()
 
         self._transport = None
+
+        self.configprops = [
+            ConfigProp(self, self.PROP_THRESH, "Threshold", 0, 4096),
+            ConfigProp(self, self.PROP_RTHRESH, "Ratio Thresh", 0, 100),
+            ConfigProp(self, self.PROP_BIAS, "Bias", 0, 1),
+            ConfigProp(self, self.PROP_AMP, "Amp", 0, 1),
+        ]
 
     async def _ainit(self):
         self._transport.write([SerSpect.PACK_NOP] * 100) # Flush the device buffer if it has not been flushed yet
