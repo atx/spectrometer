@@ -115,6 +115,7 @@ enum propkey {
 	CONF_THRESH	= 0x02,
 	CONF_BIAS	= 0x03,
 	CONF_AMP	= 0x04,
+	CONF_RTHRESH = 0x05,
 };
 
 struct propvar {
@@ -132,19 +133,20 @@ static void comm_get_fw(const struct propvar *prop)
 	comm_send(p, sizeof(p), true);
 }
 
-static void comm_threshold_set(const struct propvar *prop, char *buf, int len)
+static void comm_uint16_set(const struct propvar *prop, char *buf, int len)
 {
-	UNUSED(prop);
 	UNUSED(len);
-	acq_channel.threshold = le_to_u16((&buf[2]));
+	uint16_t *i = prop->data;
+	*i = le_to_u16(&buf[2]);
 }
 
-static void comm_threshold_get(const struct propvar *prop)
+static void comm_uint16_get(const struct propvar *prop)
 {
+	int16_t *i = prop->data;
 	char p[] =
 		{ PACKET_GETRESP, prop->key,
-			BYTE(0, acq_channel.threshold),
-			BYTE(1, acq_channel.threshold)};
+			BYTE(0, *i),
+			BYTE(1, *i)};
 	comm_send(p, sizeof(p), true);
 }
 
@@ -191,9 +193,10 @@ static struct boolprop boolprop_amp = {
 
 static const struct propvar propvars[] = {
 	{ CONF_FW, comm_get_fw, NULL, 2, NULL },
-	{ CONF_THRESH, comm_threshold_get, comm_threshold_set, 2, NULL },
+	{ CONF_THRESH, comm_uint16_get, comm_uint16_set, 2, &acq_channel.threshold },
 	{ CONF_BIAS, comm_boolprop_get, comm_boolprop_set, 1, &boolprop_bias },
 	{ CONF_AMP, comm_boolprop_get, comm_boolprop_set, 1, &boolprop_amp },
+	{ CONF_RTHRESH, comm_uint16_get, comm_uint16_set, 2, &acq_channel.rthresh },
 };
 
 static const struct propvar *comm_resolve_key(enum propkey k)

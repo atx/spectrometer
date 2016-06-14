@@ -39,6 +39,7 @@
 
 struct acq_state acq_channel = {
 	.threshold = 100,
+	.rthresh = 2,
 };
 
 #pragma GCC push_options
@@ -50,15 +51,21 @@ inline static void acq_push_sample(struct acq_state *state, uint16_t data)
 	if (state->pulse) {
 		if (data < state->threshold) {
 			state->pulse = false;
-			comm_send_event(state->max);
+			if (state->rthresh == 0 ||
+					(state->rthresh != 0 && state->falling > state->rthresh))
+				comm_send_event(state->max);
 		} else {
 			if (data > state->max) {
+				state->falling--;
 				state->max = data;
+			} else {
+				state->falling++;
 			}
 		}
 	} else {
 		if (data > state->threshold) {
 			state->max = data;
+			state->falling = -1;
 			state->pulse = true;
 		}
 	}

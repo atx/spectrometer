@@ -36,6 +36,8 @@ void acq_pause();
 struct acq_state {
 	uint16_t threshold;
 	uint16_t max;
+	uint16_t rthresh;
+	int falling;
 	bool pulse;
 	bool nbuff;
 	uint16_t buff1[BUFFER_SIZE];

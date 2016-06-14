@@ -152,6 +152,7 @@ class SerSpect(AsyncSerialSpectrometer):
     PROP_THRESH = 0x02
     PROP_BIAS = 0x03
     PROP_AMP = 0x04
+    PROP_RTHRESH = 0x05
 
     PACK_LENGTH_MAP = {
         PACK_PONG: 1,
@@ -165,6 +166,7 @@ class SerSpect(AsyncSerialSpectrometer):
         PROP_THRESH: 2,
         PROP_BIAS: 1,
         PROP_AMP: 1,
+        PROP_RTHRESH: 2,
     }
 
     _initbaud = 115200 # Does not matter really
