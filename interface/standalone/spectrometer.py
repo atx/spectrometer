@@ -162,6 +162,7 @@ class SerSpect(AsyncSerialSpectrometer):
     PROP_BIAS = 0x03
     PROP_AMP = 0x04
     PROP_RTHRESH = 0x05
+    PROP_SERNO = 0x06
 
     PACK_LENGTH_MAP = {
         PACK_PONG: 1,
@@ -176,6 +177,7 @@ class SerSpect(AsyncSerialSpectrometer):
         PROP_BIAS: 1,
         PROP_AMP: 1,
         PROP_RTHRESH: 2,
+        PROP_SERNO: 2,
     }
 
     _initbaud = 115200 # Does not matter really
@@ -205,6 +207,8 @@ class SerSpect(AsyncSerialSpectrometer):
 
         ver = await self.get_prop(SerSpect.PROP_FW)
         self.fw_version = "%d.%d" % (ver >> 8, ver & 0xff)
+
+        self.serno = await self.get_prop(SerSpect.PROP_SERNO)
 
     async def _recv_loop(self):
         while True:

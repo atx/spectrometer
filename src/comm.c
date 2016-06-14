@@ -116,6 +116,7 @@ enum propkey {
 	CONF_BIAS	= 0x03,
 	CONF_AMP	= 0x04,
 	CONF_RTHRESH = 0x05,
+	CONF_SERNO	= 0x06
 };
 
 struct propvar {
@@ -126,10 +127,11 @@ struct propvar {
 	void *data;
 };
 
-static void comm_get_fw(const struct propvar *prop)
+static void comm_const_uint16_get(const struct propvar *prop)
 {
+	uint16_t data = ((uint32_t) prop->data) & 0xffff;
 	char p[] =
-		{ PACKET_GETRESP, prop->key, LOBYTE(FIRMWARE_VERSION), HIBYTE(FIRMWARE_VERSION) };
+		{ PACKET_GETRESP, prop->key, LOBYTE(data), HIBYTE(data)};
 	comm_send(p, sizeof(p), true);
 }
 
@@ -192,11 +194,12 @@ static struct boolprop boolprop_amp = {
 };
 
 static const struct propvar propvars[] = {
-	{ CONF_FW, comm_get_fw, NULL, 2, NULL },
+	{ CONF_FW, comm_const_uint16_get, NULL, 2, (void *)FIRMWARE_VERSION },
 	{ CONF_THRESH, comm_uint16_get, comm_uint16_set, 2, &acq_channel.threshold },
 	{ CONF_BIAS, comm_boolprop_get, comm_boolprop_set, 1, &boolprop_bias },
 	{ CONF_AMP, comm_boolprop_get, comm_boolprop_set, 1, &boolprop_amp },
 	{ CONF_RTHRESH, comm_uint16_get, comm_uint16_set, 2, &acq_channel.rthresh },
+	{ CONF_SERNO, comm_const_uint16_get, NULL, 2, (void *)SERNO }
 };
 
 static const struct propvar *comm_resolve_key(enum propkey k)

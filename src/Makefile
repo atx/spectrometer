@@ -30,6 +30,13 @@ LDFLAGS += --specs=rdimon.specs -Wl,--start-group -lgcc -lc -lm -lrdimon -Wl,--e
 FP_FLAGS ?= -mfloat-abi=hard -mfpu=fpv4-sp-d16
 ARCH_FLAGS = -mthumb -mcpu=cortex-m4 $(FP_FLAGS)
 
+ifndef SERNO
+SERNO=0
+SERSTR="NOT SET"
+else
+SERSTR="SPECT$(shell printf '%04d' $(SERNO))"
+endif
+
 OBJS = bias.o reset.o main.o cdc.o comm.o acq.o
 
 ifeq ($(DEBUG),1)
@@ -97,6 +104,7 @@ CFLAGS		+= -Os -g3 -ggdb
 CFLAGS		+= -Wextra -Wshadow -Wimplicit-function-declaration
 CFLAGS		+= -Wredundant-decls -Wno-main
 CFLAGS		+= -fno-common -ffunction-sections -fdata-sections
+CFLAGS		+= -DSERNO=$(SERNO) -DSERSTR=\"$(SERSTR)\"
 
 ###############################################################################
 # C++ flags

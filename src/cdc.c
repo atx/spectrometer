@@ -18,6 +18,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.*
  */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <libopencm3/cm3/nvic.h>
@@ -239,7 +240,7 @@ void usb_lp_can1_rx0_isr()
 
 static const char usb_string_manufacturer[] = "IEAP CTU";
 static const char usb_string_product[] = "Spectrometer Acquisition Board";
-static char usb_string_serno[] = "XXXXXXXXXXXXXXXXXXXXXXXX"; /* 12 bytes, two chars per byte */
+static const char usb_string_serno[] = SERSTR; /* 12 bytes, two chars per byte */
 
 static const char *usb_strings[] = {
 	usb_string_manufacturer,
@@ -285,7 +286,6 @@ inline static void cdc_pullup(bool to)
 void cdc_init()
 {
 	gpio_mode_setup(BANK_PULLUP, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_PULLUP);
-	desig_get_unique_id_as_string(usb_string_serno, sizeof(usb_string_serno));
 
 	cdc_pullup(false);
 	// TODO: Maybe add a deterministic delay here?
