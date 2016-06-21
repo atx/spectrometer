@@ -20,5 +20,6 @@
 
 #define PRIO_USB	8
 #define PRIO_ACQ	9
+#define PRIO_FLUSH	10
 
 #endif

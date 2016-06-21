@@ -18,6 +18,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.*
  */
 
+#include "cdc.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,6 +31,7 @@
 #include <libopencm3/stm32/usart.h>
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/stm32/desig.h>
+#include <libopencm3/stm32/timer.h>
 #include <libopencm3/stm32/f3/syscfg.h>
 #include <libopencm3/stm32/st_usbfs.h>
 
@@ -205,6 +208,15 @@ static void cdcacm_data_rx_cb(usbd_device *usbd_dev, uint8_t ep)
 	(void)len;
 }
 
+void tim1_trg_com_tim17_isr()
+{
+	if (timer_get_flag(TIM17, TIM_SR_CC1IF)) {
+		timer_clear_flag(TIM17, TIM_SR_CC1IF);
+		timer_set_counter(TIM17, 0);
+		cdc_flush();
+	}
+}
+
 static void cdcacm_set_config(usbd_device *usbd_dev, uint16_t wValue)
 {
 	(void)wValue;
@@ -219,6 +231,33 @@ static void cdcacm_set_config(usbd_device *usbd_dev, uint16_t wValue)
 				USB_REQ_TYPE_CLASS | USB_REQ_TYPE_INTERFACE,
 				USB_REQ_TYPE_TYPE | USB_REQ_TYPE_RECIPIENT,
 				cdcacm_control_request);
+
+	// Enable periodic flush timer
+	rcc_periph_clock_enable(RCC_TIM17);
+	timer_reset(TIM17);
+
+	timer_set_mode(TIM17, TIM_CR1_CKD_CK_INT, 0, TIM_CR1_DIR_DOWN);
+	timer_set_prescaler(TIM17, (rcc_apb1_frequency * 2) / 1024);
+	timer_disable_preload(TIM17);
+	timer_continuous_mode(TIM17);
+
+	timer_disable_oc_output(TIM17, TIM_OC1);
+	timer_disable_oc_output(TIM17, TIM_OC2);
+	timer_disable_oc_output(TIM17, TIM_OC3);
+	timer_disable_oc_output(TIM17, TIM_OC4);
+
+	timer_disable_oc_clear(TIM17, TIM_OC1);
+	timer_disable_oc_preload(TIM17, TIM_OC1);
+
+	timer_set_oc_slow_mode(TIM17, TIM_OC1);
+	timer_set_oc_mode(TIM17, TIM_OC1, TIM_OCM_FROZEN);
+
+	timer_set_oc_value(TIM17, TIM_OC1, 2000); // About once every 15ms or so
+
+	timer_enable_counter(TIM17);
+
+	timer_enable_irq(TIM17, TIM_DIER_CC1IE);
+	nvic_enable_irq(NVIC_TIM1_TRG_COM_TIM17_IRQ);
 }
 
 static usbd_device *usbd_dev;

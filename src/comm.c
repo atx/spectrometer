@@ -72,7 +72,6 @@ void comm_send_event(uint16_t val)
 {
 	char p[] = { PACKET_EVENT, LOBYTE(val), HIBYTE(val) };
 	comm_send(p, sizeof(p), false);
-	cdc_flush();
 }
 
 void comm_send_wave(uint16_t *vals, int len)
