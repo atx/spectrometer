@@ -73,7 +73,6 @@ class DummySpectrometer(Spectrometer):
         super(DummySpectrometer, self).__init__(channels = chans)
         self.period = period
         self._last = time.time()
-        self.chans = chans
         self.fw_version = "1.0"
 
     async def next_event(self):
@@ -81,7 +80,12 @@ class DummySpectrometer(Spectrometer):
         if dt < self.period:
             await asyncio.sleep(self.period - dt)
         self._last += self.period
-        return int(random.gauss(200, 10)) if random.random() < 0.1 else int(random.gauss(2000, 300))
+        val = None
+        while val is None or val <= 0 or val > self.channels:
+            val = random.gauss(0.05, 0.025) if random.random() < 0.2 else random.gauss(0.5, 0.075)
+            val *= self.channels
+            val = int(val)
+        return val
 
 
 class AsyncSerialSpectrometer(Spectrometer, asyncio.Protocol):
