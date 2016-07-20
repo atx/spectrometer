@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-from spectrometer import *
+from ieapspect import *
 import time
 import glob
 import concurrent

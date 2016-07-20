@@ -31,7 +31,7 @@ import os
 import sys
 import time
 from aiohttp import web
-from spectrometer import DummySpectrometer, SIPOSSpectrometer, SerSpect
+from ieapspect import DummySpectrometer, SIPOSSpectrometer, SerSpect
 
 
 class Client:
