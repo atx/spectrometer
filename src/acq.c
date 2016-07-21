@@ -45,6 +45,14 @@ struct acq_state acq_channel = {
 #pragma GCC push_options
 #pragma GCC optimize ("O3")
 
+#define BANK_LED		GPIOB
+#define GPIO_LED		GPIO0
+
+inline static void led_toggle()
+{
+	gpio_toggle(BANK_LED, GPIO_LED);
+}
+
 ALWAYS_INLINE
 inline static void acq_push_sample(struct acq_state *state, uint16_t data)
 {
@@ -74,11 +82,17 @@ inline static void acq_push_sample(struct acq_state *state, uint16_t data)
 RAMFUNC
 void dma1_channel2_isr(void)
 {
+	static int isr_count = 0;
 	int off = DMA1_ISR & DMA_ISR_HTIF2 ? 0 : BUFFER_SIZE / 2 ;
 
 	for (int i = 0; i < BUFFER_SIZE / 2; i++)
 		acq_push_sample(&acq_channel, acq_channel.buff[off + i]);
 
+	isr_count++;
+	if (isr_count > 300) {
+		led_toggle();
+		isr_count = 0;
+	}
 
 	DMA1_IFCR = DMA_IFCR_CHTIF2 | DMA_IFCR_CTCIF2;
 }
@@ -107,6 +121,8 @@ void acq_init()
 	/* Initialize amplifier control GPIO */
 	gpio_mode_setup(BANK_AMP, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_AMP);
 	gpio_clear(BANK_AMP, GPIO_AMP);
+	gpio_mode_setup(BANK_LED, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_LED);
+	gpio_clear(BANK_LED, GPIO_LED);
 
 	/* Initialize SPI GPIOs */
 	gpio_mode_setup(BANK_CS, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO_CS);
@@ -172,6 +188,7 @@ void acq_start()
 
 void acq_pause()
 {
+	gpio_clear(BANK_LED, GPIO_LED);
 	spi_disable(SPI_C1);
 	spi_disable_rx_dma(SPI_C1);
 	dma_disable_transfer_complete_interrupt(DMA1, DMA_CHANNEL2);
