@@ -71,35 +71,16 @@ inline static void acq_push_sample(struct acq_state *state, uint16_t data)
 	}
 }
 
-ALWAYS_INLINE
-inline static uint16_t *acq_switch_buffer(struct acq_state *state)
-{
-	state->nbuff = !state->nbuff;
-	if (state->nbuff)
-		return state->buff2;
-	return state->buff1;
-}
-
-ALWAYS_INLINE
-inline static void acq_process_dma(struct acq_state *state)
-{
-	uint16_t *buff = state->nbuff ? state->buff1 : state->buff2;
-
-	for (int i = 0; i < BUFFER_SIZE; i++)
-		acq_push_sample(state, buff[i]);
-}
-
 RAMFUNC
 void dma1_channel2_isr(void)
 {
-	DMA1_IFCR |= DMA_IFCR_CTCIF2;
-	// TODO: Inline these calls
-	dma_disable_channel(DMA1, DMA_CHANNEL2);
-	dma_set_memory_address(DMA1, DMA_CHANNEL2, (uint32_t)acq_switch_buffer(&acq_channel));
-	dma_set_number_of_data(DMA1, DMA_CHANNEL2, BUFFER_SIZE);
-	dma_enable_channel(DMA1, DMA_CHANNEL2);
+	int off = DMA1_ISR & DMA_ISR_HTIF2 ? 0 : BUFFER_SIZE / 2 ;
 
-	acq_process_dma(&acq_channel);
+	for (int i = 0; i < BUFFER_SIZE / 2; i++)
+		acq_push_sample(&acq_channel, acq_channel.buff[off + i]);
+
+
+	DMA1_IFCR = DMA_IFCR_CHTIF2 | DMA_IFCR_CTCIF2;
 }
 
 #pragma GCC pop_options
@@ -145,7 +126,7 @@ void acq_init()
 	dma_disable_channel(DMA1, DMA_CHANNEL2);
 
 	dma_set_peripheral_address(DMA1, DMA_CHANNEL2, (uint32_t)&SPI_DR(SPI_C1));
-	dma_set_memory_address(DMA1, DMA_CHANNEL2, (uint32_t)&acq_channel.buff1);
+	dma_set_memory_address(DMA1, DMA_CHANNEL2, (uint32_t)&acq_channel.buff);
 	dma_set_number_of_data(DMA1, DMA_CHANNEL2, BUFFER_SIZE);
 
 	dma_set_priority(DMA1, DMA_CHANNEL2, DMA_CCR_PL_MEDIUM);
@@ -154,6 +135,7 @@ void acq_init()
 	dma_set_peripheral_size(DMA1, DMA_CHANNEL2, DMA_CCR_PSIZE_16BIT);
 	dma_enable_memory_increment_mode(DMA1, DMA_CHANNEL2);
 	dma_set_read_from_peripheral(DMA1, DMA_CHANNEL2);
+	dma_enable_circular_mode(DMA1, DMA_CHANNEL2);
 
 	nvic_set_priority(NVIC_DMA1_CHANNEL2_IRQ, PRIO_ACQ);
 }
@@ -183,6 +165,7 @@ void acq_start()
 
 	spi_enable_rx_dma(SPI_C1);
 	dma_enable_transfer_complete_interrupt(DMA1, DMA_CHANNEL2);
+	dma_enable_half_transfer_interrupt(DMA1, DMA_CHANNEL2);
 	dma_enable_channel(DMA1, DMA_CHANNEL2);
 	nvic_enable_irq(NVIC_DMA1_CHANNEL2_IRQ);
 }

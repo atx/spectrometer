@@ -31,7 +31,7 @@ void acq_amp_disable();
 void acq_start();
 void acq_pause();
 
-#define BUFFER_SIZE		500
+#define BUFFER_SIZE		1000
 
 struct acq_state {
 	uint16_t threshold;
@@ -39,9 +39,7 @@ struct acq_state {
 	uint16_t rthresh;
 	int falling;
 	bool pulse;
-	bool nbuff;
-	uint16_t buff1[BUFFER_SIZE];
-	uint16_t buff2[BUFFER_SIZE];
+	uint16_t buff[BUFFER_SIZE];
 };
 
 #define CHANNEL_COUNT				2
