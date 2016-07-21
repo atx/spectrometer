@@ -292,8 +292,11 @@ static int tx_buffer_cnt;
 
 int cdc_flush()
 {
-	int ret = usbd_ep_write_packet(usbd_dev, EP_TX, tx_buffer, tx_buffer_cnt);
-	tx_buffer_cnt = 0;
+	int ret = 0;
+	if (tx_buffer_cnt > 0) {
+		ret = usbd_ep_write_packet(usbd_dev, EP_TX, tx_buffer, tx_buffer_cnt);
+		tx_buffer_cnt = 0;
+	}
 	return ret;
 }
 
