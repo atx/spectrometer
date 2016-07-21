@@ -173,4 +173,9 @@ void acq_start()
 void acq_pause()
 {
 	spi_disable(SPI_C1);
+	spi_disable_rx_dma(SPI_C1);
+	dma_disable_transfer_complete_interrupt(DMA1, DMA_CHANNEL2);
+	dma_disable_half_transfer_interrupt(DMA1, DMA_CHANNEL2);
+	dma_disable_channel(DMA1, DMA_CHANNEL2);
+	nvic_disable_irq(NVIC_DMA1_CHANNEL2_IRQ);
 }
