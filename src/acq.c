@@ -48,53 +48,64 @@ struct acq_state acq_channel = {
 #define BANK_LED		GPIOB
 #define GPIO_LED		GPIO0
 
+inline static void led_on()
+{
+	gpio_set(BANK_LED, GPIO_LED);
+}
+
 inline static void led_toggle()
 {
 	gpio_toggle(BANK_LED, GPIO_LED);
-}
-
-ALWAYS_INLINE
-inline static void acq_push_sample(struct acq_state *state, uint16_t data)
-{
-	if (state->pulse) {
-		if (data < state->threshold) {
-			state->pulse = false;
-			if (state->rthresh == 0 ||
-					(state->rthresh != 0 && state->falling > state->rthresh))
-				comm_send_event(state->max);
-		} else {
-			if (data > state->max) {
-				state->falling--;
-				state->max = data;
-			} else {
-				state->falling++;
-			}
-		}
-	} else {
-		if (data > state->threshold) {
-			state->max = data;
-			state->falling = -1;
-			state->pulse = true;
-		}
-	}
 }
 
 RAMFUNC
 void dma1_channel2_isr(void)
 {
 	static int isr_count = 0;
+	static int event_count = 0;
 	int off = DMA1_ISR & DMA_ISR_HTIF2 ? 0 : BUFFER_SIZE / 2 ;
+	uint16_t data;
 
-	for (int i = 0; i < BUFFER_SIZE / 2; i++)
-		acq_push_sample(&acq_channel, acq_channel.buff[off + i]);
+	DMA1_IFCR = DMA_IFCR_CHTIF2 | DMA_IFCR_CTCIF2;
+
+	for (int i = 0; i < BUFFER_SIZE / 2; i++) {
+		data = acq_channel.buff[off + i];
+		if (acq_channel.pulse) {
+			if (data < acq_channel.threshold) {
+				acq_channel.pulse = false;
+				if (acq_channel.rthresh == 0 ||
+						(acq_channel.rthresh != 0 && acq_channel.falling > acq_channel.rthresh)) {
+					if (!acq_channel.mute)
+						comm_send_event(acq_channel.max);
+					event_count++;
+				}
+			} else {
+				if (data > acq_channel.max) {
+					acq_channel.falling--;
+					acq_channel.max = data;
+				} else {
+					acq_channel.falling++;
+				}
+			}
+		} else {
+			if (data > acq_channel.threshold) {
+				acq_channel.max = data;
+				acq_channel.falling = -1;
+				acq_channel.pulse = true;
+			}
+		}
+	}
 
 	isr_count++;
 	if (isr_count > 300) {
-		led_toggle();
+		acq_channel.mute = event_count > 100;
+		if (!acq_channel.mute)
+			led_toggle();
+		else
+			led_on();
 		isr_count = 0;
+		event_count = 0;
 	}
-
-	DMA1_IFCR = DMA_IFCR_CHTIF2 | DMA_IFCR_CTCIF2;
 }
 
 #pragma GCC pop_options

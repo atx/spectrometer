@@ -39,6 +39,7 @@ struct acq_state {
 	uint16_t rthresh;
 	int falling;
 	bool pulse;
+	bool mute;
 	uint16_t buff[BUFFER_SIZE];
 };
 
