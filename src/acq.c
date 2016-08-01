@@ -39,7 +39,7 @@
 
 struct acq_state acq_channel = {
 	.threshold = 100,
-	.rthresh = 2,
+	.rthresh = 0,
 };
 
 #pragma GCC push_options
