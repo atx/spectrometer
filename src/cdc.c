@@ -35,6 +35,7 @@
 #include <libopencm3/stm32/f3/syscfg.h>
 #include <libopencm3/stm32/st_usbfs.h>
 
+#include "acq.h"
 #include "utils.h"
 #include "comm.h"
 #include "prios.h"
@@ -48,6 +49,9 @@
 
 #define TX_MAX_PACKET  64
 #define RX_MAX_PACKET  64
+
+static char tx_buffer[TX_MAX_PACKET];
+static int tx_buffer_cnt;
 
 static const struct usb_device_descriptor dev = {
 	.bLength = USB_DT_DEVICE_SIZE,
@@ -192,6 +196,8 @@ static int cdcacm_control_request(usbd_device *usbd_dev, struct usb_setup_data *
 	(void)usbd_dev;
 	(void)req;
 	(void)len;
+	acq_pause();
+	tx_buffer_cnt = 0;
 	return 0;
 }
 
@@ -287,34 +293,35 @@ static const char *usb_strings[] = {
 	usb_string_serno,
 };
 
-static char tx_buffer[TX_MAX_PACKET];
-static int tx_buffer_cnt;
+static inline int fifo_remaining()
+{
+	return ARRAY_SIZE(tx_buffer) - tx_buffer_cnt;
+}
 
-int cdc_flush()
+// TODO: Move the FIFO to a separate .c file...
+void cdc_flush()
 {
 	int ret = 0;
 	if (tx_buffer_cnt > 0) {
-		ret = usbd_ep_write_packet(usbd_dev, EP_TX, tx_buffer, tx_buffer_cnt);
-		tx_buffer_cnt = 0;
+		ret = usbd_ep_write_packet(usbd_dev, EP_TX, tx_buffer,
+								   min(TX_MAX_PACKET, tx_buffer_cnt));
+		tx_buffer_cnt -= ret;
+		memmove(&tx_buffer[0], &tx_buffer[ret], tx_buffer_cnt);
 	}
-	return ret;
 }
 
 int cdc_send(char *buf, int len)
 {
-	// Note that this will only send TX_MAX_PACKETLEN * 2
-	int tc = min(TX_MAX_PACKET - tx_buffer_cnt, len);
-	int ntc = 0;
-	memcpy(&tx_buffer[tx_buffer_cnt], buf, tc);
-	tx_buffer_cnt += tc;
-	if (tx_buffer_cnt == TX_MAX_PACKET) {
-		ntc = min(len - tc, TX_MAX_PACKET);
-		if (cdc_flush() && ntc > 0) {
-			memcpy(&tx_buffer[tx_buffer_cnt], &buf[tc], ntc);
-			tx_buffer_cnt += ntc;
-		}
-	}
-	return tc + ntc;
+	if (fifo_remaining() < len)
+		cdc_flush();
+
+	if (fifo_remaining() < len)
+		return 0;
+
+	memcpy(&tx_buffer[tx_buffer_cnt], buf, len);
+	tx_buffer_cnt += len;
+
+	return len;
 }
 
 inline static void cdc_pullup(bool to)

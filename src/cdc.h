@@ -20,6 +20,6 @@
 
 int cdc_send(char *buf, int len);
 void cdc_init();
-int cdc_flush();
+void cdc_flush();
 
 #endif
