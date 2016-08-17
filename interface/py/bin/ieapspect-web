@@ -189,7 +189,7 @@ async def main():
     parser.add_argument(
         "-s", "--serial",
         help = "Serial port to use",
-        default = "/dev/ttyACM*"
+        default = None
     )
     parser.add_argument(
         "-t", "--type",
@@ -215,13 +215,13 @@ async def main():
     if args.type == "dummy":
         spectrometer = DummySpectrometer(period = 0.001, chans = 4096)
     elif args.type == "serial":
-        spectrometer = await SerSpect.connect(glob.glob(args.serial)[0])
+        spectrometer = await SerSpect.connect(args.serial)
         spectrometer.set_prop(SerSpect.PROP_THRESH, THRESHOLD)
         spectrometer.set_prop(SerSpect.PROP_AMP, 0)
         spectrometer.set_prop(SerSpect.PROP_BIAS, 1)
         assert await spectrometer.get_prop(SerSpect.PROP_THRESH) == THRESHOLD
     elif args.type == "sipos":
-        spectrometer = await SIPOSSpectrometer.connect(glob.glob(args.serial)[0])
+        spectrometer = await SIPOSSpectrometer.connect(args.serial)
 
     app = WebApp(spectrometer, logfile = args.log)
 

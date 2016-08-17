@@ -27,11 +27,13 @@ import datetime
 import functools
 import operator
 import random
+import re
 import serial
 import serial.aio
 import struct
 import subprocess
 import sys
+from serial.tools import list_ports
 
 class ConfigProp:
 
@@ -93,6 +95,8 @@ class DummySpectrometer(Spectrometer):
 
 class AsyncSerialSpectrometer(Spectrometer, asyncio.Protocol):
 
+    _description = None
+
     def __init__(self, channels):
         super(AsyncSerialSpectrometer, self).__init__(channels = channels)
         self._initsem = asyncio.Semaphore(value = 0)
@@ -113,7 +117,11 @@ class AsyncSerialSpectrometer(Spectrometer, asyncio.Protocol):
         return ret
 
     @classmethod
-    async def connect(cls, port):
+    async def connect(cls, port = None):
+        if port is None and cls._description is not None:
+            for s in list_ports.comports():
+                if re.match(cls._description, s.description):
+                    port = s.device
         transport, spect = await serial.aio.create_serial_connection(
                                 asyncio.get_event_loop(), cls, port, cls._initbaud)
         await spect._initsem.acquire()
@@ -132,6 +140,7 @@ class AsyncSerialSpectrometer(Spectrometer, asyncio.Protocol):
 
 class SIPOSSpectrometer(AsyncSerialSpectrometer):
 
+    _description = "Photodiode Spectrometer"
     _initbaud = 500000
 
     def __init__(self, sername):
@@ -187,6 +196,7 @@ class SerSpect(AsyncSerialSpectrometer):
         PROP_SERNO: 2,
     }
 
+    _description = "Spectrometer Acquisition Board"
     _initbaud = 115200 # Does not matter really
 
     def __init__(self):
