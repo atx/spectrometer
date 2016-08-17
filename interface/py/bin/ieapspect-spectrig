@@ -1,0 +1,51 @@
+#! /usr/bin/env python3
+
+import argparse
+import asyncio
+import ieapspect
+import json
+import sys
+
+parser = argparse.ArgumentParser(
+    prog = __file__
+)
+
+parser.add_argument(
+    "-t", "--threshold",
+    help = "Threshold value",
+    type = int,
+    default = 2000
+)
+
+parser.add_argument(
+    "--sample_count",
+    help = "Amount of samples to take",
+    type = int,
+    default = 100,
+)
+
+parser.add_argument(
+    "--pretrig",
+    help = "Amount of pre-trigger samples",
+    type = int,
+    default = 10,
+)
+
+args = parser.parse_args()
+
+async def main():
+    spect = await ieapspect.Spectrig.connect()
+    spect.threshold = args.threshold
+    spect.sample_count = args.sample_count
+    spect.pretrig = args.pretrig
+    spect.start()
+    while True:
+        p = await spect.next_event()
+        obj = {}
+        for atn in ["waveform", "timestamp"]:
+            if getattr(p, atn) is not None:
+                obj[atn] = getattr(p, atn)
+        print(json.dumps(obj))
+        sys.stdout.flush()
+
+asyncio.get_event_loop().run_until_complete(main())

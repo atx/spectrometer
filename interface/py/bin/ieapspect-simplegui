@@ -1,0 +1,79 @@
+#! /usr/bin/env python3
+
+import argparse
+import asyncio
+import atexit
+import sys
+import json
+import time
+from quamash import QtGui, QEventLoop
+import pyqtgraph as pg
+
+# TODO: Build a proper GUI application supporting multiple spectrometer types,
+# online configuration etcetc
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(
+        prog = __file__
+    )
+
+    parser.add_argument(
+        "-c", "--channels",
+        help = "Amount of channels the input has",
+        type = int,
+        default = 4096
+    )
+
+    parser.add_argument(
+        "-d", "--divide-by",
+        help = "A number to divide the peak value by",
+        type = int,
+        default = 1
+    )
+
+    args = parser.parse_args()
+
+    app = QtGui.QApplication([])
+    loop = QEventLoop(app)
+    asyncio.set_event_loop(loop)
+    atexit.register(loop.close)
+
+    win = pg.GraphicsWindow()
+    pg.setConfigOptions(antialias=True)
+
+    postdivchans = args.channels // args.divide_by
+
+    splt = win.addPlot()
+    splt.setXRange(0, postdivchans)
+    scurve = splt.plot(pen="y")
+    spectrum = [0] * postdivchans
+    win.nextRow()
+
+    wplt = win.addPlot()
+    wplt.setYRange(0, args.channels)
+    wcurve = wplt.plot(pen="y")
+    global levent
+    levent = None
+    def next_event():
+        global levent
+        ev = json.loads(sys.stdin.readline())
+
+        val = ev["value"] if "value" in ev else max(ev["waveform"])
+        val //= args.divide_by
+
+        spectrum[val] += 1
+
+        now = time.time()
+        if levent is None or now - levent > 0.1:
+            sys.stdout.flush()
+            levent = now
+            scurve.setData(spectrum)
+            if "waveform" in ev:
+                wcurve.setData(ev["waveform"])
+
+    for pl in [splt, wplt]:
+        pl.setMouseEnabled(True, False)
+
+    loop.add_reader(sys.stdin.fileno(), next_event)
+    loop.run_forever()

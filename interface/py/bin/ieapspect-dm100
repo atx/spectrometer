@@ -1,0 +1,117 @@
+#! /usr/bin/env python3
+
+import argparse
+import asyncio
+import ieapspect
+import json
+import sys
+
+parser = argparse.ArgumentParser(
+    prog = __file__
+)
+
+parser.add_argument(
+    "-l", "--lld",
+    help = "Value of the low level discriminator",
+    type = int,
+    default = 34000
+)
+
+parser.add_argument(
+    "-n", "--negative",
+    help = "Detect negative peaks instead of positive",
+    action = "store_true"
+)
+
+parser.add_argument(
+    "-t", "--timestamp",
+    help = "Add timestamp",
+    action = "store_true"
+)
+
+parser.add_argument(
+    "-m", "--mode",
+    help = "Mode of measurement",
+    choices = ["sample", "sample_tot", "waveform"],
+    default = "sample_tot"
+)
+
+parser.add_argument(
+    "--pretrig",
+    help = "Samples before trigger",
+    type = int,
+    default = 10,
+)
+
+parser.add_argument(
+    "--posttrig",
+    help = "Samples after trigger",
+    type = int,
+    default = 10,
+)
+
+parser.add_argument(
+    "--start_mode",
+    help = "Sampling start mode",
+    choices = ["lld", "ext"],
+    default = "lld"
+)
+
+parser.add_argument(
+    "--end_mode",
+    help = "Sampling end mode",
+    choices = ["lld", "count"],
+    default = "lld"
+)
+
+parser.add_argument(
+    "--count",
+    help = "Amount of samples to capture in waveform mode",
+    type = int,
+    default = 20,
+)
+
+parser.add_argument(
+    "--sw-trigger",
+    help = "Force SW trigger every X seconds",
+    type = int,
+    default = None
+)
+
+args = parser.parse_args()
+
+async def sw_trigger_loop(sp, t):
+    while True:
+        sp.sw_trigger()
+        await asyncio.sleep(t)
+
+async def main():
+    spect = await ieapspect.DM100.connect()
+    spect.addtime = args.timestamp
+    spect.pretrig = args.pretrig
+    spect.count = args.count
+    spect.posttrig = args.posttrig
+    spect.start_mode = {"lld": ieapspect.DM100.START_MODE_LLD,
+                        "ext": ieapspect.DM100.START_MODE_EXT}[args.start_mode]
+    spect.end_mode = {"lld": ieapspect.DM100.END_MODE_LLD,
+                      "count": ieapspect.DM100.END_MODE_COUNT}[args.end_mode]
+    if args.mode == "sample":
+        spect.mode = ieapspect.DM100.MODE_SAMPLE
+    elif args.mode == "sample_tot":
+        spect.mode = ieapspect.DM100.MODE_SAMPLE_TOT
+    elif args.mode == "waveform":
+        spect.mode = ieapspect.DM100.MODE_WAVEFORM
+    spect.lld = args.lld
+    spect.start()
+    if args.sw_trigger is not None:
+        asyncio.ensure_future(sw_trigger_loop(spect, args.sw_trigger))
+    while True:
+        p = await spect.recv_packet()
+        obj = {}
+        for atn in ["value", "waveform", "tot", "timestamp"]:
+            if getattr(p, atn) is not None:
+                obj[atn] = getattr(p, atn)
+        print(json.dumps(obj))
+        sys.stdout.flush()
+
+asyncio.get_event_loop().run_until_complete(main())
