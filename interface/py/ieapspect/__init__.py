@@ -72,10 +72,12 @@ class Spectrometer:
         return await self.next_event()
 
 
-class DummySpectrometer(Spectrometer):
+class DummySpect(Spectrometer):
+
+    Event = collections.namedtuple("Event", ["value"])
 
     def __init__(self, period = 1, chans = 1024):
-        super(DummySpectrometer, self).__init__(channels = chans)
+        super(DummySpect, self).__init__(channels = chans)
         self.period = period
         self._last = time.time()
         self.fw_version = "1.0"
@@ -90,7 +92,7 @@ class DummySpectrometer(Spectrometer):
             val = random.gauss(0.05, 0.025) if random.random() < 0.2 else random.gauss(0.5, 0.075)
             val *= self.channels
             val = int(val)
-        return val
+        return DummySpect.Event(value = val)
 
 
 class AsyncSerialSpectrometer(Spectrometer, asyncio.Protocol):
@@ -138,17 +140,20 @@ class AsyncSerialSpectrometer(Spectrometer, asyncio.Protocol):
         self._transport.close()
 
 
-class SIPOSSpectrometer(AsyncSerialSpectrometer):
+class SIPOSSpect(AsyncSerialSpectrometer):
+
+    Event = collections.namedtuple("Event", ["value"])
 
     _description = "Photodiode Spectrometer"
     _initbaud = 500000
 
     def __init__(self, sername):
-        super(SIPOSSpectrometer, self).__init__(channels = 4096)
+        super(SIPOSSpect, self).__init__(channels = 4096)
 
     async def next_event(self):
         at = await self.recv(2)
-        return (((at[0] & 0x3f) << 6) | (at[1] & 0x7f)) ^ 0xfff
+        val = (((at[0] & 0x3f) << 6) | (at[1] & 0x7f)) ^ 0xfff
+        return SIPOSSpect.Event(value = val)
 
 
 class SerSpectException(Exception):
@@ -157,6 +162,8 @@ class SerSpectException(Exception):
         self.errorcode = errorcode
 
 class SerSpect(AsyncSerialSpectrometer):
+
+    Event = collections.namedtuple("Event", ["value"])
 
     # Host->Device
     PACK_NOP = 0x01
@@ -291,7 +298,8 @@ class SerSpect(AsyncSerialSpectrometer):
 
     async def next_event(self):
         p = await self.recv_packet_queued(SerSpect.PACK_EVENT)
-        return self._decode_lendian(p[1:])
+        val = self._decode_lendian(p[1:])
+        return SerSpect.Event(value = val)
 
     async def next_wave(self):
         p = await self.recv_packet_queued(SerSpect.PACK_WAVE)
@@ -516,7 +524,7 @@ class DM100(Spectrometer):
     def sw_trigger(self):
         self.send_command(DM100.CMD_TRIGGER)
 
-    async def recv_packet(self):
+    async def next_event(self):
         # Calculate the packet length based on the device settings
         data = []
         header0 = None

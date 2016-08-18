@@ -32,7 +32,7 @@ import sys
 import time
 import pkg_resources
 from aiohttp import web
-from ieapspect import DummySpectrometer, SIPOSSpectrometer, SerSpect
+from ieapspect import DummySpect, SIPOSSpect, SerSpect
 
 
 class Client:
@@ -151,7 +151,8 @@ class WebApp(web.Application):
         self.spectrometer.start()
         # Leak here
         fil = open(self.logfile, "w+") if self.logfile else None
-        async for v in self.spectrometer:
+        async for ev in self.spectrometer:
+            v = ev.value
             if v >= len(self.history): # TODO: Figure out why this is here...
                 continue
             self.history[v] += 1
@@ -213,7 +214,7 @@ async def main():
     THRESHOLD = 100
 
     if args.type == "dummy":
-        spectrometer = DummySpectrometer(period = 0.001, chans = 4096)
+        spectrometer = DummySpect(period = 0.001, chans = 4096)
     elif args.type == "serial":
         spectrometer = await SerSpect.connect(args.serial)
         spectrometer.set_prop(SerSpect.PROP_THRESH, THRESHOLD)
@@ -221,7 +222,7 @@ async def main():
         spectrometer.set_prop(SerSpect.PROP_BIAS, 1)
         assert await spectrometer.get_prop(SerSpect.PROP_THRESH) == THRESHOLD
     elif args.type == "sipos":
-        spectrometer = await SIPOSSpectrometer.connect(args.serial)
+        spectrometer = await SIPOSSpect.connect(args.serial)
 
     app = WebApp(spectrometer, logfile = args.log)
 

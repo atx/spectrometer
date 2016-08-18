@@ -106,7 +106,7 @@ async def main():
     if args.sw_trigger is not None:
         asyncio.ensure_future(sw_trigger_loop(spect, args.sw_trigger))
     while True:
-        p = await spect.recv_packet()
+        p = await spect.next_event()
         obj = {}
         for atn in ["value", "waveform", "tot", "timestamp"]:
             if getattr(p, atn) is not None:
