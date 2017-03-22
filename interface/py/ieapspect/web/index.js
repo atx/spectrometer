@@ -29,7 +29,8 @@ state = {
 	finished: null,
 	threshold: 10,
 	ws: null,
-	cfgpropwid: {}
+	cfgpropwid: {},
+	autosave: null
 }
 
 function clamp(v, mi, mx) {
@@ -170,6 +171,18 @@ function download(fname, data) {
 	document.body.removeChild(el);
 }
 
+function downloadTXT() {
+	var startlabel = (new Date(state.since * 1000)).toISOString()
+	var data = "-_-\n";
+	data += "from: " + startlabel + "\n";
+	data += "to: " + (new Date(endTime() * 1000)).toISOString() + "\n";
+	data += "---\n";
+	for (var i = 0; i < state.histogram.length; i++) {
+		data += state.histogram[i] + "\n";
+	}
+	download("data-" + startlabel.substring(0, 19) + ".txt", data);
+}
+
 function init() {
 	state.svg = d3.select("body").append("svg");
 
@@ -216,15 +229,18 @@ function init() {
 		state.threshold = $(this).val();
 		update();
 	}).trigger("change");
-	$("#csv").click(function () {
-		var data = "-_-\n";
-		data += "from: " + Math.floor(state.since) + "\n";
-		data += "to: " + Math.floor(endTime()) + "\n";
-		data += "---\n";
-		for (var i = 0; i < state.histogram.length; i++) {
-			data += state.histogram[i] + "\n";
+	$("#csv").click(downloadTXT);
+	$("#autosave").change(function(ev) {
+		clearInterval(state.autosave);
+		var v = parseInt($(ev.target).val());
+		if (isNaN(v)) {
+			state.autosave = null;
+		} else {
+			setInterval(function() {
+				downloadTXT();
+				commandSender("clear")();
+			}, v * 1000);
 		}
-		download("data.txt", data);
 	});
 }
 
