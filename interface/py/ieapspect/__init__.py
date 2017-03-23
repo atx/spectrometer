@@ -33,6 +33,7 @@ import serial.aio
 import struct
 import subprocess
 import sys
+import time
 from serial.tools import list_ports
 
 class ConfigProp:
