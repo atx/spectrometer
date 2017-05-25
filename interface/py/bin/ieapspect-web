@@ -211,7 +211,7 @@ async def main():
 
     args = parser.parse_args()
 
-    THRESHOLD = 100
+    THRESHOLD = 50
 
     if args.type == "dummy":
         spectrometer = DummySpect(period = 0.001, chans = 4096)
