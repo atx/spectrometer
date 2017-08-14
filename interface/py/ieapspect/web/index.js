@@ -122,7 +122,7 @@ function update() {
 					.tickSize(-($(state.svg[0][0]).width() - 20))
 					.outerTickSize(0);
 
-	xaxis = d3.svg.axis()
+	var xaxis = d3.svg.axis()
 				.scale(state.xscale)
 				.orient("top")
 				.outerTickSize(0);
@@ -136,7 +136,28 @@ function update() {
 		if (binned[i] > 0) {
 			if (!state.binbars[i])
 				state.binbars[i] = state.svg.select(".wrap").append("rect").attr("class", "bar");
-			state.binbars[i].data([{x: i, y: binned[i]}]);
+			var x = state.xscale(i * state.binsize);
+			var w = barw * state.zoom.scale() - Math.floor(barw * state.zoom.scale() * 0.15)
+			// Beyond the edge, drop the bar entirely
+			if (x + w < 0 || y > $(state.svg[0][0]).width()) {
+				state.binbars[i].remove();
+				state.binbars[i] = null;
+				continue;
+			}
+			// Partially occluded, note that we don't care about occlusion
+			// on the right border, as there are no axis we could be covering
+			if (x < 0) {
+				w = w + x;
+				x = 0;
+			}
+			var y = Math.floor(state.yscale(binned[i]))
+			var h = Math.floor(binned[i] * perh)
+			state.binbars[i].data([{
+				x: x,
+				w: w,
+				y: y,
+				h: h,
+			}]);
 		} else if (state.binbars[i]) {
 			state.binbars[i].remove();
 			state.binbars[i] = null;
@@ -145,11 +166,11 @@ function update() {
 
 	var bs = state.svg.selectAll(".bar");
 
-	bs.attr("x", function(d) { return state.xscale(d.x * state.binsize) })
-		.attr("width", barw * state.zoom.scale() - Math.floor(barw * state.zoom.scale() * 0.15));
+	bs.attr("width", function(d) { return d.w; })
+		.attr("x", function(d) { return d.x; });
 
-	bs.attr("height", function(d) { return Math.floor(d.y * perh) + "px" })
-		.attr("y", function(d) { return Math.floor(state.yscale(d.y)) });
+	bs.attr("height", function(d) { return d.h + "px"; })
+		.attr("y", function(d) { return d.y; });
 
 	d3.select(".pane")
 		.attr("width", $(state.svg[0][0]).width() + "px")
