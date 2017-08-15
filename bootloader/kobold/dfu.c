@@ -217,7 +217,13 @@ static int usbdfu_control_request(usbd_device *usbd_dev, struct usb_setup_data *
 	return 0;
 }
 
-__attribute__((noinline))
+static bool reset_requested = false;
+
+static void usbdfu_reset()
+{
+	reset_requested = true;
+}
+
 static void usbdfu_set_config(usbd_device *usbd_dev, uint16_t wValue)
 {
 	(void)wValue;
@@ -227,6 +233,7 @@ static void usbdfu_set_config(usbd_device *usbd_dev, uint16_t wValue)
 				USB_REQ_TYPE_CLASS | USB_REQ_TYPE_INTERFACE,
 				USB_REQ_TYPE_TYPE | USB_REQ_TYPE_RECIPIENT,
 				usbdfu_control_request);
+	usbd_register_reset_callback(usbd_dev, usbdfu_reset);
 }
 
 int kobold_dfu_run(void *data_)
@@ -243,8 +250,8 @@ int kobold_dfu_run(void *data_)
 
 	usbd_register_set_config_callback(usbd_dev, usbdfu_set_config);
 
-	// TODO: Terminate
-	while (1) {
+	while (!reset_requested) {
 		usbd_poll(usbd_dev);
 	}
+	return KOBOLD_DFU_OUTCOME_DONE;
 }
