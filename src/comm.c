@@ -23,6 +23,7 @@
 
 #include "acq.h"
 #include "bias.h"
+#include "bootloader.h"
 #include "cdc.h"
 #include "comm.h"
 #include "utils.h"
@@ -37,6 +38,7 @@ enum packet_type {
 	PACKET_SET		= 0x04,
 	PACKET_START	= 0x05,
 	PACKET_END		= 0x06,
+	PACKET_DFU		= 0x07,
 
 	/* Device -> Host */
 	PACKET_PONG		= 0x82,
@@ -269,6 +271,17 @@ static int comm_cb_end(char *buf, int len)
 	return 1;
 }
 
+static int comm_cb_dfu(char *buf, int len)
+{
+	(void)buf;
+	(void)len;
+	// TODO: Get a proper DFU runtime descriptor
+	// Note: this will cause an error on the host side, as we are not properly
+	// ACKing this data.
+	bootloader_enter_dfu();
+	return 1;
+}
+
 struct callback {
 	int (*fn)(char *buf, int len);
 	enum packet_type type;
@@ -281,6 +294,7 @@ static const struct callback callbacks[] = {
 	{ comm_cb_set,	PACKET_SET },
 	{ comm_cb_start,  PACKET_START },
 	{ comm_cb_end,    PACKET_END },
+	{ comm_cb_dfu,	PACKET_DFU }
 };
 
 void comm_push_rx(char *new, int len)

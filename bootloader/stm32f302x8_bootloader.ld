@@ -4,8 +4,8 @@
 
 MEMORY
 {
-	flash_bootloader (RX) : org = 0x08000000, len = 12k /* For completeness */
-	flash_app (RX)  : org = 0x08003000, len = 52k
+	flash_bootloader (RX)  : org = 0x08000000, len = 12k
+	flash_app (RX) : org = 0x08003000, len = 52k
 	ram   (RWX) : org = 0x20000000, len = 16k
 }
 
@@ -15,10 +15,10 @@ ENTRY(reset_handler)
 
 SECTIONS
 {
-	.vectors ORIGIN(flash_app) : ALIGN(256)
+	.vectors ORIGIN(flash_bootloader) : ALIGN(256)
 	{
 		KEEP(*(.vectors));
-	} > flash_app
+	} > flash_bootloader
 
 	.text : ALIGN(16) SUBALIGN(16)
 	{
@@ -29,7 +29,7 @@ SECTIONS
 		*(.rodata.*)
 		*(.gcc*)
 		_text_end = .;
-	} > flash_app
+	} > flash_bootloader
 
 	_data_flash_start = _text_end;
 
@@ -48,7 +48,7 @@ SECTIONS
 		*(.ramtext)
 		*(.ramfuncs)
 		_data_end = .;
-	} > ram AT > flash_app
+	} > ram AT > flash_bootloader
 
 	.bss : ALIGN(4) SUBALIGN(4)
 	{
@@ -58,4 +58,6 @@ SECTIONS
 		*(COMMON)
 		_bss_end = .;
 	} > ram
+
+	_flash_app_start = ORIGIN(flash_app);
 }

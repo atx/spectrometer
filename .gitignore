@@ -36,3 +36,6 @@
 .*
 _autosave*
 __pycache__
+
+# clang compilation database
+compile_commands.json

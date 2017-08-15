@@ -19,26 +19,19 @@
 ## along with this library.  If not, see <http://www.gnu.org/licenses/>.
 ##
 
-BINARY	= spectrometer
+BINARY	= spectrometer_bootloader
 LIBNAME	= opencm3_stm32f3
 DEFS   += -D STM32F3
-LDSCRIPT = stm32f302x8.ld
+LDSCRIPT = stm32f302x8_bootloader.ld
 
 LDFLAGS += -Wl,--build-id=none
 LDFLAGS += --specs=rdimon.specs -Wl,--start-group -lgcc -lc -lm -lrdimon -Wl,--end-group
-LDFLAGS += -Wl,--just-symbols=../bootloader/kobold.sym
+LDFLAGS += -Wl,--just-symbols=kobold.sym
 
 FP_FLAGS ?= -mfloat-abi=hard -mfpu=fpv4-sp-d16
 ARCH_FLAGS = -mthumb -mcpu=cortex-m4 $(FP_FLAGS)
 
-ifndef SERNO
-SERNO=0
-SERSTR="NOT SET"
-else
-SERSTR="SPECT$(shell printf '%04d' $(SERNO))"
-endif
-
-OBJS = bias.o reset.o main.o cdc.o comm.o acq.o bootloader.o
+OBJS = main.o kobold/reset.o kobold/kobold.o kobold/appctl.o kobold/boot_m3.o kobold/dfu.o
 
 ifeq ($(DEBUG),1)
 	CFLAGS += -DDEBUG
@@ -79,7 +72,7 @@ ifeq ($(strip $(OPENCM3_DIR)),)
 # user has not specified the library path, so we try to detect it
 
 # where we search for the library
-LIBPATHS := ./libopencm3 ../../../../libopencm3 ../../../../../libopencm3
+LIBPATHS := ../src/libopencm3
 
 OPENCM3_DIR := $(wildcard $(LIBPATHS:=/locm3.sublime-project))
 OPENCM3_DIR := $(firstword $(dir $(OPENCM3_DIR)))
@@ -97,8 +90,6 @@ endif
 INCLUDE_DIR	= $(OPENCM3_DIR)/include
 LIB_DIR		= $(OPENCM3_DIR)/lib
 SCRIPT_DIR	= $(OPENCM3_DIR)/scripts
-
-BOOTLOADER_DIR = ../bootloader/
 
 ###############################################################################
 # C flags
@@ -121,7 +112,7 @@ CXXFLAGS	+= -fno-common -ffunction-sections -fdata-sections
 
 CPPFLAGS	+= -MD
 CPPFLAGS	+= -Wall -Wundef
-CPPFLAGS	+= -I$(INCLUDE_DIR) -I$(BOOTLOADER_DIR) $(DEFS)
+CPPFLAGS	+= -I$(INCLUDE_DIR) $(DEFS)
 
 ###############################################################################
 # Linker flags
@@ -170,7 +161,7 @@ $(LDSCRIPT):
 
 %.bin: %.elf
 	@#printf "  OBJCOPY $(*).bin\n"
-	$(Q)$(OBJCOPY) -Obinary --only-section=.text --only-section=.data --only-section=.vectors $(*).elf $(*).bin
+	$(Q)$(OBJCOPY) -Obinary $(*).elf $(*).bin
 
 %.hex: %.elf
 	@#printf "  OBJCOPY $(*).hex\n"
@@ -202,7 +193,7 @@ $(LDSCRIPT):
 
 clean:
 	@#printf "  CLEAN\n"
-	$(Q)$(RM) *.o *.d *.elf *.bin *.hex *.srec *.list *.map
+	$(Q)$(RM) $(OBJS) $(OBJS:.o=.d) *.o *.d *.elf *.bin *.hex *.srec *.list *.map
 
 stylecheck: $(STYLECHECKFILES:=.stylecheck)
 styleclean: $(STYLECHECKFILES:=.styleclean)

@@ -31,6 +31,8 @@
 #include <libopencm3/stm32/f3/syscfg.h>
 #include <libopencm3/stm32/f3/flash.h>
 
+#include "kobold/appctl.h"
+
 #include "acq.h"
 #include "bias.h"
 #include "cdc.h"
