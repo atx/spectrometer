@@ -26,12 +26,11 @@ LDSCRIPT = stm32f302x8_bootloader.ld
 
 LDFLAGS += -Wl,--build-id=none
 LDFLAGS += --specs=rdimon.specs -Wl,--start-group -lgcc -lc -lm -lrdimon -Wl,--end-group
-LDFLAGS += -Wl,--just-symbols=kobold.sym
 
 FP_FLAGS ?= -mfloat-abi=hard -mfpu=fpv4-sp-d16
 ARCH_FLAGS = -mthumb -mcpu=cortex-m4 $(FP_FLAGS)
 
-OBJS = main.o kobold/reset.o kobold/kobold.o kobold/appctl.o kobold/boot_m3.o kobold/dfu.o
+OBJS = main.o shared.o kobold/reset.o kobold/kobold.o kobold/appctl.o kobold/boot_m3.o kobold/dfu.o
 
 ifeq ($(DEBUG),1)
 	CFLAGS += -DDEBUG

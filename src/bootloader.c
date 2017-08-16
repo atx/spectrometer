@@ -17,8 +17,7 @@
 
 #include <libopencm3/cm3/scb.h>
 #include "kobold/appctl.h"
-
-extern struct kobold_appctl_data kobold_appctl;
+#include "shared.h"
 
 void bootloader_enter_dfu()
 {

@@ -26,7 +26,6 @@ LDSCRIPT = stm32f302x8.ld
 
 LDFLAGS += -Wl,--build-id=none
 LDFLAGS += --specs=rdimon.specs -Wl,--start-group -lgcc -lc -lm -lrdimon -Wl,--end-group
-LDFLAGS += -Wl,--just-symbols=../bootloader/kobold.sym
 
 FP_FLAGS ?= -mfloat-abi=hard -mfpu=fpv4-sp-d16
 ARCH_FLAGS = -mthumb -mcpu=cortex-m4 $(FP_FLAGS)
@@ -38,7 +37,7 @@ else
 SERSTR="SPECT$(shell printf '%04d' $(SERNO))"
 endif
 
-OBJS = bias.o reset.o main.o cdc.o comm.o acq.o bootloader.o
+OBJS = bias.o reset.o main.o cdc.o comm.o acq.o bootloader.o shared.o
 
 ifeq ($(DEBUG),1)
 	CFLAGS += -DDEBUG

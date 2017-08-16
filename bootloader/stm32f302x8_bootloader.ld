@@ -33,7 +33,9 @@ SECTIONS
 
 	_data_flash_start = _text_end;
 
-	.stack ORIGIN(ram) : ALIGN(4) SUBALIGN(4)
+	INCLUDE ./shared.ram.inc.ld
+
+	.stack : ALIGN(4) SUBALIGN(4)
 	{
 		_stack_start = .;
 		KEEP(*(.stack));
