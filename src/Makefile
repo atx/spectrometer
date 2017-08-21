@@ -172,22 +172,22 @@ $(LDSCRIPT):
     endif
 
 %.images: %.bin %.hex %.srec %.list %.map
-	@#printf "*** $* images generated ***\n"
+	@printf "*** $* images generated ***\n"
 
 %.hex: %.elf
-	@#printf "  OBJCOPY $(*).hex\n"
+	@printf "  OBJCOPY $(*).hex\n"
 	$(Q)$(OBJCOPY) -Oihex $(*).elf $(*).hex
 
 %.srec: %.elf
-	@#printf "  OBJCOPY $(*).srec\n"
+	@printf "  OBJCOPY $(*).srec\n"
 	$(Q)$(OBJCOPY) -Osrec $(*).elf $(*).srec
 
 %.list: %.elf
-	@#printf "  OBJDUMP $(*).list\n"
+	@printf "  OBJDUMP $(*).list\n"
 	$(Q)$(OBJDUMP) -S $(*).elf > $(*).list
 
 %.elf %.map %.bin: $(OBJS) $(LDSCRIPT) $(LIB_DIR)/lib$(LIBNAME).a
-	@#printf "  LD      $(*).elf\n"
+	@printf "  LD      $(*).elf\n"
 	$(Q)$(LD) $(LDFLAGS) $(ARCH_FLAGS) $(OBJS) $(LDLIBS) -o $(*).elf
 	$(Q)$(OBJCOPY) $(OBJCOPY_BIN_FLAGS) $(*).elf $(*).tmp.bin
 	$(Q)./crcelf.py -s kobold_crc -b $(*).tmp.bin $(*).elf
@@ -199,15 +199,15 @@ $(LDSCRIPT):
 	$(Q)$(CC) $(CFLAGS) $(CPPFLAGS) $(ARCH_FLAGS) -o $(*).o -c $(*).c
 
 %.o: %.cxx
-	@#printf "  CXX     $(*).cxx\n"
+	@printf "  CXX     $(*).cxx\n"
 	$(Q)$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(ARCH_FLAGS) -o $(*).o -c $(*).cxx
 
 %.o: %.cpp
-	@#printf "  CXX     $(*).cpp\n"
+	@printf "  CXX     $(*).cpp\n"
 	$(Q)$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(ARCH_FLAGS) -o $(*).o -c $(*).cpp
 
 clean:
-	@#printf "  CLEAN\n"
+	@printf "  CLEAN\n"
 	$(Q)$(RM) *.o *.d *.elf *.bin *.hex *.srec *.list *.map
 
 stylecheck: $(STYLECHECKFILES:=.stylecheck)
