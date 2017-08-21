@@ -94,10 +94,10 @@ $(info Using $(OPENCM3_DIR) path to library)
 endif
 
 INCLUDE_DIR	= $(OPENCM3_DIR)/include
+BOOTLOADER_DIR = ../bootloader/
+SHARED_DIR	= ../shared/
 LIB_DIR		= $(OPENCM3_DIR)/lib
 SCRIPT_DIR	= $(OPENCM3_DIR)/scripts
-
-BOOTLOADER_DIR = ../bootloader/
 
 ###############################################################################
 # C flags
@@ -120,7 +120,7 @@ CXXFLAGS	+= -fno-common -ffunction-sections -fdata-sections
 
 CPPFLAGS	+= -MD
 CPPFLAGS	+= -Wall -Wundef
-CPPFLAGS	+= -I$(INCLUDE_DIR) -I$(BOOTLOADER_DIR) $(DEFS)
+CPPFLAGS	+= -I$(INCLUDE_DIR) -I$(BOOTLOADER_DIR) -I$(SHARED_DIR) $(DEFS)
 
 ###############################################################################
 # Linker flags

@@ -2,12 +2,7 @@
  * Linker script for STM32F302x8
  * */
 
-MEMORY
-{
-	flash_bootloader (RX) : org = 0x08000000, len = 12k /* For completeness */
-	flash_app (RX)  : org = 0x08003000, len = 52k
-	ram   (RWX) : org = 0x20000000, len = 16k
-}
+INCLUDE ../shared/stm32f302x8.memory.inc.ld
 
 EXTERN(vector_table)
 
@@ -22,7 +17,7 @@ SECTIONS
 
 	.kobold.flash : ALIGN(4) SUBALIGN(4)
 	{
-		KEEP(*(.kobold.flash.crc));
+		INCLUDE ../shared/shared.flash.inc.ld
 	} > flash_app
 
 	.text : ALIGN(16) SUBALIGN(16)
@@ -38,7 +33,7 @@ SECTIONS
 
 	_data_flash_start = _text_end;
 
-	INCLUDE ../bootloader/shared.ram.inc.ld
+	INCLUDE ../shared/shared.ram.inc.ld
 
 	.stack (NOLOAD) : ALIGN(4) SUBALIGN(4)
 	{

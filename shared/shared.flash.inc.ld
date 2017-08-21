@@ -1,0 +1,1 @@
+KEEP(*(.kobold.flash.crc));
