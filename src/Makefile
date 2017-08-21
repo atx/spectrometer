@@ -140,6 +140,13 @@ endif
 LDLIBS		+= -l$(LIBNAME)
 LDLIBS		+= -Wl,--start-group -lc -lgcc -Wl,--end-group
 
+
+###############################################################################
+# Objcopy .bin flags
+OBJCOPY_BIN_FLAGS = -Obinary --only-section=.text --only-section=.data \
+					--only-section=.vectors --only-section=.kobold.flash \
+					--gap-fill 0xff
+
 ###############################################################################
 ###############################################################################
 ###############################################################################
@@ -167,10 +174,6 @@ $(LDSCRIPT):
 %.images: %.bin %.hex %.srec %.list %.map
 	@#printf "*** $* images generated ***\n"
 
-%.bin: %.elf
-	@#printf "  OBJCOPY $(*).bin\n"
-	$(Q)$(OBJCOPY) -Obinary --only-section=.text --only-section=.data --only-section=.vectors $(*).elf $(*).bin
-
 %.hex: %.elf
 	@#printf "  OBJCOPY $(*).hex\n"
 	$(Q)$(OBJCOPY) -Oihex $(*).elf $(*).hex
@@ -183,9 +186,13 @@ $(LDSCRIPT):
 	@#printf "  OBJDUMP $(*).list\n"
 	$(Q)$(OBJDUMP) -S $(*).elf > $(*).list
 
-%.elf %.map: $(OBJS) $(LDSCRIPT) $(LIB_DIR)/lib$(LIBNAME).a
+%.elf %.map %.bin: $(OBJS) $(LDSCRIPT) $(LIB_DIR)/lib$(LIBNAME).a
 	@#printf "  LD      $(*).elf\n"
 	$(Q)$(LD) $(LDFLAGS) $(ARCH_FLAGS) $(OBJS) $(LDLIBS) -o $(*).elf
+	$(Q)$(OBJCOPY) $(OBJCOPY_BIN_FLAGS) $(*).elf $(*).tmp.bin
+	$(Q)./crcelf.py -s kobold_crc -b $(*).tmp.bin $(*).elf
+	$(Q)$(RM) $(*).tmp.bin
+	$(Q)$(OBJCOPY) $(OBJCOPY_BIN_FLAGS) $(*).elf $(*).bin
 
 %.o: %.c
 	@printf "  CC      $(*).c\n"

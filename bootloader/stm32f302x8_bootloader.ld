@@ -62,4 +62,10 @@ SECTIONS
 	} > ram
 
 	_flash_app_start = ORIGIN(flash_app);
+	_flash_app_stop = ORIGIN(flash_app) + LENGTH(flash_app);
+
+	.kobold.flash ORIGIN(flash_app) + SIZEOF(.vectors) (NOLOAD) : ALIGN(4) SUBALIGN(4)
+	{
+		KEEP(*(.kobold.flash.crc));
+	} > flash_app
 }

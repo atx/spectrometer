@@ -20,6 +20,11 @@ SECTIONS
 		KEEP(*(.vectors));
 	} > flash_app
 
+	.kobold.flash : ALIGN(4) SUBALIGN(4)
+	{
+		KEEP(*(.kobold.flash.crc));
+	} > flash_app
+
 	.text : ALIGN(16) SUBALIGN(16)
 	{
 		_text_start = .;
@@ -60,4 +65,7 @@ SECTIONS
 		*(COMMON)
 		_bss_end = .;
 	} > ram
+
+	_flash_app_start = ORIGIN(flash_app);
+	_flash_app_stop = ORIGIN(flash_app) + LENGTH(flash_app);
 }

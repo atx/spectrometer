@@ -30,7 +30,7 @@ LDFLAGS += --specs=rdimon.specs -Wl,--start-group -lgcc -lc -lm -lrdimon -Wl,--e
 FP_FLAGS ?= -mfloat-abi=hard -mfpu=fpv4-sp-d16
 ARCH_FLAGS = -mthumb -mcpu=cortex-m4 $(FP_FLAGS)
 
-OBJS = main.o shared.o kobold/reset.o kobold/kobold.o kobold/appctl.o kobold/boot_m3.o kobold/dfu.o
+OBJS = main.o shared.o kobold/reset.o kobold/kobold.o kobold/appctl.o kobold/boot_m3.o kobold/dfu.o kobold/crc.o
 
 ifeq ($(DEBUG),1)
 	CFLAGS += -DDEBUG
@@ -71,7 +71,8 @@ ifeq ($(strip $(OPENCM3_DIR)),)
 # user has not specified the library path, so we try to detect it
 
 # where we search for the library
-LIBPATHS := ../src/libopencm3
+MAIN_APP_DIR := ../src
+LIBPATHS := $(MAIN_APP_DIR)/libopencm3
 
 OPENCM3_DIR := $(wildcard $(LIBPATHS:=/locm3.sublime-project))
 OPENCM3_DIR := $(firstword $(dir $(OPENCM3_DIR)))

@@ -27,6 +27,7 @@
 #include "kobold/dfu.h"
 
 extern int _flash_app_start;
+extern int _flash_app_stop;
 
 static struct kobold_boot_m3_data boot_m3_data = {
 	.application = &_flash_app_start,
@@ -100,13 +101,30 @@ static const struct kobold_module module_dfu = {
 
 };
 
+extern struct kobold_crc_header kobold_crc;
+
+static struct kobold_crc_data crc_data = {
+	.header = &kobold_crc,
+	.code_start = &_flash_app_start,
+	.code_end = &_flash_app_stop
+};
+
+static const struct kobold_module module_crc = {
+	.data = &crc_data,
+	.run = kobold_crc_run,
+	.outcomes = {
+		[KOBOLD_CRC_OUTCOME_PASS] = &module_boot,
+		[KOBOLD_CRC_OUTCOME_FAIL] = &module_dfu,
+	}
+};
+
 extern struct kobold_appctl_data kobold_appctl;
 
 static const struct kobold_module module_appctl = {
 	.data = &kobold_appctl,
 	.run = kobold_appctl_run,
 	.outcomes = {
-		[KOBOLD_APPCTL_OUTCOME_CONTINUE] = &module_boot,
+		[KOBOLD_APPCTL_OUTCOME_CONTINUE] = &module_crc,
 		[KOBOLD_APPCTL_OUTCOME_FLASH] = &module_dfu,
 	}
 };
