@@ -40,7 +40,7 @@ SECTIONS
 
 	INCLUDE ../bootloader/shared.ram.inc.ld
 
-	.stack : ALIGN(4) SUBALIGN(4)
+	.stack (NOLOAD) : ALIGN(4) SUBALIGN(4)
 	{
 		_stack_start = .;
 		KEEP(*(.stack));
