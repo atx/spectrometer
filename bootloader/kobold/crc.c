@@ -36,5 +36,6 @@ int kobold_crc_run(void *data_)
 		crc = crc_calculate((at != &data->header->crc && at != &data->header->length) ? *at : 0x00000000);
 	}
 	crc ^= 0xffffffff;
+	rcc_periph_clock_disable(RCC_CRC);
 	return crc == data->header->crc ? KOBOLD_CRC_OUTCOME_PASS : KOBOLD_CRC_OUTCOME_FAIL;
 }
