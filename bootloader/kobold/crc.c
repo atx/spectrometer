@@ -20,12 +20,6 @@
 
 #include "crc.h"
 
-int break_here()
-{
-	rcc_periph_clock_enable(RCC_CRC);
-	return 10;
-}
-
 int kobold_crc_run(void *data_)
 {
 	struct kobold_crc_data *data = data_;
@@ -40,9 +34,6 @@ int kobold_crc_run(void *data_)
 	uint32_t crc = 0;
 	for (uint32_t i = 0; i < data->header->length && at != data->code_end; at++, i += 4) {
 		crc = crc_calculate((at != &data->header->crc && at != &data->header->length) ? *at : 0x00000000);
-		if (i == 3330) {
-			break_here();
-		}
 	}
 	crc ^= 0xffffffff;
 	return crc == data->header->crc ? KOBOLD_CRC_OUTCOME_PASS : KOBOLD_CRC_OUTCOME_FAIL;
