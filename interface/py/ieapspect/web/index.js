@@ -30,7 +30,8 @@ state = {
 	threshold: 10,
 	ws: null,
 	cfgpropwid: {},
-	autosave: null
+	autosave: null,
+	lastFrame: 0,
 }
 
 function clamp(v, mi, mx) {
@@ -177,6 +178,20 @@ function update() {
 		.attr("height", $(state.svg[0][0]).height() + "px");
 }
 
+function updateLoop(timestamp) {
+	// See https://remysharp.com/2015/07/13/optimising-a-canvas-animation for 
+	// reference
+	window.requestAnimationFrame(updateLoop);
+
+	var delta = timestamp - state.lastFrame;
+	if (delta < 50) {
+		return;
+	}
+	state.lastFrame = timestamp;
+
+	update();
+}
+
 function commandSender(cmd) {
 	return function () { state.ws.send(JSON.stringify({"command": cmd}))}
 }
@@ -302,7 +317,7 @@ function initRemote(data) {
 	})
 	$("#clear").click(commandSender("clear"));
 
-	setInterval(update, 100);
+	updateLoop();
 	setInterval(updateTimer, 1000);
 	$("#clear").attr("disabled", null);
 
