@@ -151,7 +151,7 @@ function update() {
 				x = 0;
 			}
 			var y = Math.floor(state.yscale(binned[i]))
-			var h = Math.floor(binned[i] * perh)
+			var h = $(state.svg[0][0]).height() - y;
 			state.binbars[i].data([{
 				x: x,
 				w: w,
