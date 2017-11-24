@@ -25,10 +25,8 @@ import argparse
 import asyncio
 import base64
 import datetime
-import glob
 import json
 import os
-import sys
 import time
 import pkg_resources
 from aiohttp import web
@@ -84,9 +82,10 @@ class Client:
             elif msg.tp == web.MsgType.close:
                 break
 
+
 class WebApp(web.Application):
 
-    def __init__(self, spectrometer, logfile = None):
+    def __init__(self, spectrometer, logfile=None):
         super(WebApp, self).__init__()
 
         self.spectrometer = spectrometer
@@ -117,13 +116,13 @@ class WebApp(web.Application):
         self.router.add_static("/", pkg_resources.resource_filename("ieapspect.web", ""))
 
     async def handle_metadata(self, req):
-        return web.Response(body = self.metadata_json, content_type = "application/json")
+        return web.Response(body=self.metadata_json, content_type="application/json")
 
     async def handle_data(self, req):
         ret = "-_-\n---\n"
         for x in self.history:
             ret += ("%d\n" % x)
-        return web.Response(body = ret.encode(), content_type = "text/plain")
+        return web.Response(body=ret.encode(), content_type="text/plain")
 
     async def handle_index(self, req):
         return web.HTTPFound("/index.html")
@@ -153,7 +152,7 @@ class WebApp(web.Application):
         fil = open(self.logfile, "w+") if self.logfile else None
         async for ev in self.spectrometer:
             v = ev.value
-            if v >= len(self.history): # TODO: Figure out why this is here...
+            if v >= len(self.history):  # TODO: Figure out why this is here...
                 continue
             self.history[v] += 1
             self.broadcast_event(v)
@@ -185,28 +184,26 @@ class WebApp(web.Application):
 async def main():
 
     parser = argparse.ArgumentParser(
-        prog = "Spectrometer GUI"
+        prog="Spectrometer GUI"
     )
     parser.add_argument(
         "-s", "--serial",
-        help = "Serial port to use",
-        default = None
+        help="Serial port to use",
     )
     parser.add_argument(
         "-t", "--type",
-        help = "Spectrometer type",
-        choices = ["dummy", "serial", "sipos"],
-        default = "serial"
+        help="Spectrometer type",
+        choices=["dummy", "serial", "sipos"],
+        default="serial",
     )
     parser.add_argument(
         "-b", "--bind",
-        help = "Address to bind to",
-        default = "127.0.0.1"
+        help="Address to bind to",
+        default="127.0.0.1",
     )
     parser.add_argument(
         "-l", "--log",
-        help = "Log timestamped events into a file",
-        default = None
+        help="Log timestamped events into a file",
     )
 
     args = parser.parse_args()
@@ -214,7 +211,7 @@ async def main():
     THRESHOLD = 50
 
     if args.type == "dummy":
-        spectrometer = DummySpect(period = 0.001, chans = 4096)
+        spectrometer = DummySpect(period=0.001, chans=4096)
     elif args.type == "serial":
         spectrometer = await SerSpect.connect(args.serial)
         spectrometer.set_prop(SerSpect.PROP_THRESH, THRESHOLD)
@@ -224,11 +221,11 @@ async def main():
     elif args.type == "sipos":
         spectrometer = await SIPOSSpect.connect(args.serial)
 
-    app = WebApp(spectrometer, logfile = args.log)
+    app = WebApp(spectrometer, logfile=args.log)
 
     asyncio.ensure_future(app.spectrometer_loop())
 
-    return lambda: web.run_app(app, host = args.bind, port = 4000)
+    return lambda: web.run_app(app, host=args.bind, port=4000)
 
 if __name__ == "__main__":
     fn = asyncio.get_event_loop().run_until_complete(main())

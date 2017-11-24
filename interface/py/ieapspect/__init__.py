@@ -36,6 +36,7 @@ import sys
 import time
 from serial.tools import list_ports
 
+
 class ConfigProp:
 
     def __init__(self, spect, id, name, fr, to):
@@ -43,6 +44,7 @@ class ConfigProp:
         self.name = name
         self.fr = fr
         self.to = to
+
 
 class Spectrometer:
 
@@ -77,8 +79,8 @@ class DummySpect(Spectrometer):
 
     Event = collections.namedtuple("Event", ["value"])
 
-    def __init__(self, period = 1, chans = 1024):
-        super(DummySpect, self).__init__(channels = chans)
+    def __init__(self, period=1, channels=1024):
+        super(DummySpect, self).__init__(channels=channels)
         self.period = period
         self._last = time.time()
         self.fw_version = "1.0"
@@ -93,7 +95,7 @@ class DummySpect(Spectrometer):
             val = random.gauss(0.05, 0.025) if random.random() < 0.2 else random.gauss(0.5, 0.075)
             val *= self.channels
             val = int(val)
-        return DummySpect.Event(value = val)
+        return DummySpect.Event(value=val)
 
 
 class AsyncSerialSpectrometer(Spectrometer, asyncio.Protocol):
@@ -101,8 +103,8 @@ class AsyncSerialSpectrometer(Spectrometer, asyncio.Protocol):
     _description = None
 
     def __init__(self, channels):
-        super(AsyncSerialSpectrometer, self).__init__(channels = channels)
-        self._initsem = asyncio.Semaphore(value = 0)
+        super(AsyncSerialSpectrometer, self).__init__(channels=channels)
+        self._initsem = asyncio.Semaphore(value=0)
         self._recvqueue = asyncio.Queue()
 
     def connection_made(self, transport):
@@ -113,14 +115,14 @@ class AsyncSerialSpectrometer(Spectrometer, asyncio.Protocol):
         for x in range(len(data)):
             self._recvqueue.put_nowait(data[x:x + 1])
 
-    async def recv(self, nbytes = 1):
+    async def recv(self, nbytes=1):
         ret = b""
         for _ in range(nbytes):
             ret += await self._recvqueue.get()
         return ret
 
     @classmethod
-    async def connect(cls, port = None):
+    async def connect(cls, port=None):
         if port is None and cls._description is not None:
             for s in list_ports.comports():
                 if re.match(cls._description, s.description):
@@ -149,18 +151,19 @@ class SIPOSSpect(AsyncSerialSpectrometer):
     _initbaud = 500000
 
     def __init__(self, sername):
-        super(SIPOSSpect, self).__init__(channels = 4096)
+        super(SIPOSSpect, self).__init__(channels=4096)
 
     async def next_event(self):
         at = await self.recv(2)
         val = (((at[0] & 0x3f) << 6) | (at[1] & 0x7f)) ^ 0xfff
-        return SIPOSSpect.Event(value = val)
+        return SIPOSSpect.Event(value=val)
 
 
 class SerSpectException(Exception):
 
     def __init__(self, errorcode):
         self.errorcode = errorcode
+
 
 class SerSpect(AsyncSerialSpectrometer):
 
@@ -190,7 +193,7 @@ class SerSpect(AsyncSerialSpectrometer):
 
     PACK_LENGTH_MAP = {
         PACK_PONG: 1,
-        PACK_GETRESP: None, # See PROP_LENGTH_MAP
+        PACK_GETRESP: None,  # See PROP_LENGTH_MAP
         PACK_EVENT: 3,
         PACK_ERROR: 2,
     }
@@ -205,10 +208,10 @@ class SerSpect(AsyncSerialSpectrometer):
     }
 
     _description = "Spectrometer Acquisition Board"
-    _initbaud = 115200 # Does not matter really
+    _initbaud = 115200  # Does not matter really
 
     def __init__(self):
-        super(SerSpect, self).__init__(channels = 4096)
+        super(SerSpect, self).__init__(channels=4096)
         self.event_loop = asyncio.get_event_loop()
         self._packqueues = [asyncio.Queue() for _ in range(256)]
         self._packlock = asyncio.Lock()
@@ -224,7 +227,8 @@ class SerSpect(AsyncSerialSpectrometer):
         ]
 
     async def _ainit(self):
-        self._transport.write([SerSpect.PACK_NOP] * 100) # Flush the device buffer if it has not been flushed yet
+        # Flush the device buffer if it has not been flushed yet
+        self._transport.write([SerSpect.PACK_NOP] * 100)
         self.flush()
         asyncio.ensure_future(self._recv_loop())
         self.set_prop(SerSpect.PROP_BIAS, 0)
@@ -300,7 +304,7 @@ class SerSpect(AsyncSerialSpectrometer):
     async def next_event(self):
         p = await self.recv_packet_queued(SerSpect.PACK_EVENT)
         val = self._decode_lendian(p[1:])
-        return SerSpect.Event(value = val)
+        return SerSpect.Event(value=val)
 
     async def next_wave(self):
         p = await self.recv_packet_queued(SerSpect.PACK_WAVE)
@@ -319,7 +323,7 @@ class DM100(Spectrometer):
             self.cmd = cmd
             self.val = 0
 
-        def __get__(self, obj, obtype = None):
+        def __get__(self, obj, obtype=None):
             if obj is None:
                 return self
             return self.val
@@ -330,12 +334,12 @@ class DM100(Spectrometer):
 
     class DualByteRegister:
 
-        def __init__(self, cmdhi, cmdlo = None):
+        def __init__(self, cmdhi, cmdlo=None):
             self.cmdhi = cmdhi
             self.cmdlo = cmdhi + 1 if cmdlo is None else cmdlo
             self.val = 0
 
-        def __get__(self, obj, obtype = None):
+        def __get__(self, obj, obtype=None):
             if obj is None:
                 return self
             return self.val
@@ -350,7 +354,7 @@ class DM100(Spectrometer):
             self.reg = reg
             self.off = off
 
-        def __get__(self, obj, obtype = None):
+        def __get__(self, obj, obtype=None):
             if obj is None:
                 return self
             return bool(self.reg.__get__(obj) & (1 << self.off))
@@ -368,7 +372,7 @@ class DM100(Spectrometer):
             self.off = off
             self.mask = ((1 << width) - 1) << self.off
 
-        def __get__(self, obj, obtype = None):
+        def __get__(self, obj, obtype=None):
             if obj is None:
                 return self
             return (self.reg.__get__(obj) & self.mask) >> self.off
@@ -442,7 +446,7 @@ class DM100(Spectrometer):
     addlost = RegBit(maskcfg, 7)
 
     def __init__(self, proc):
-        super(DM100, self).__init__(channels = 65536)
+        super(DM100, self).__init__(channels=65536)
         self._proc = proc
         self.pipe = self._proc.stdin
         self._queue = asyncio.Queue()
@@ -451,9 +455,9 @@ class DM100(Spectrometer):
     async def connect():
         proc = await asyncio.create_subprocess_exec(
                             "ieapspect-wrapper-dm100",
-                            stdin = subprocess.PIPE,
-                            stdout = subprocess.PIPE,
-                            stderr = sys.stderr)
+                            stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE,
+                            stderr=sys.stderr)
 
         def _kill_on_exit():
             proc.kill()
@@ -502,7 +506,7 @@ class DM100(Spectrometer):
     def start(self):
         self.disable_inhibit()
 
-    def send_command(self, cmd, data = 0):
+    def send_command(self, cmd, data=0):
         bs = bytes([cmd, data])
         self._proc.stdin.write(bs)
 
@@ -571,14 +575,14 @@ class DM100(Spectrometer):
             checksum_valid = scheck == checksum
 
         return DM100.Event(
-                    header0 = header0,
-                    header1 = header1,
-                    packet_id = packet_id,
-                    value = value,
-                    tot = tot,
-                    waveform = waveform,
-                    timestamp = times,
-                    checksum_valid = checksum_valid)
+                    header0=header0,
+                    header1=header1,
+                    packet_id=packet_id,
+                    value=value,
+                    tot=tot,
+                    waveform=waveform,
+                    timestamp=times,
+                    checksum_valid=checksum_valid)
 
     async def _recv_word(self):
         w = await self._recv(2)
@@ -615,7 +619,7 @@ class Spectrig(Spectrometer, asyncio.SubprocessProtocol):
             self.cmd = cmd
             self.val = 0
 
-        def __get__(self, obj, obtype = None):
+        def __get__(self, obj, obtype=None):
             if obj is None:
                 return self
             return self.val
@@ -661,7 +665,7 @@ class Spectrig(Spectrometer, asyncio.SubprocessProtocol):
     pretrig = CmdProp(CMD_SET_PRETRIG)
 
     def __init__(self):
-        super(Spectrig, self).__init__(channels = 4096)
+        super(Spectrig, self).__init__(channels=4096)
         self.pipe = None
         self.trans = None
         self._buffer = collections.deque()
@@ -675,6 +679,7 @@ class Spectrig(Spectrometer, asyncio.SubprocessProtocol):
         create = loop.subprocess_exec(lambda: Spectrig(),
                                       "ieapspect-wrapper-spectrig")
         trans, prot = await create
+
         def _kill_on_exit():
             trans.kill()
         atexit.register(_kill_on_exit)
@@ -693,7 +698,7 @@ class Spectrig(Spectrometer, asyncio.SubprocessProtocol):
             from subprocess import CalledProcessError
             raise CalledProcessError("Failed to start the Spectrig wrapper")
 
-    def _send_packet(self, cmd, pars = [0, 0, 0]):
+    def _send_packet(self, cmd, pars=[0, 0, 0]):
         pack = []
         pack.append(Spectrig.PACKET_HEADER)
         pack.append(cmd)
@@ -723,16 +728,16 @@ class Spectrig(Spectrometer, asyncio.SubprocessProtocol):
         pass
 
     def _handle_packet_spectro(self, pack):
-        packid = pack[1] & 0b00111111
-        trigmark = pack[2] & 0x3f
-        pulsepart = pack[2] & 0xc0
+        #packid = pack[1] & 0b00111111
+        #trigmark = pack[2] & 0x3f
+        #pulsepart = pack[2] & 0xc0
         dlen, = struct.unpack(">H", pack[514:516])
         vals = struct.unpack(">%dH" % dlen, pack[2:2 + dlen * 2])
         ts = 0
         for x in pack[517:517 + 8]:
             ts = (ts << 8) | x
 
-        ev = Spectrig.Event(waveform = vals, timestamp = ts)
+        ev = Spectrig.Event(waveform=vals, timestamp=ts)
         self._evqueue.put_nowait(ev)
 
     def _handle_packet(self, pack):
@@ -780,7 +785,7 @@ class HistFile:
             if line != "-_-\n":
                 raise ValueError("Invalid magic line %s" % start)
             while line != "---\n":
-                spl = line.split(": ", maxsplit = 1)
+                spl = line.split(": ", maxsplit=1)
                 if len(spl) == 2:
                     key, val = (s.strip() for s in spl)
                     key = key.lower()
