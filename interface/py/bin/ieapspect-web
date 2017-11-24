@@ -228,7 +228,7 @@ async def main():
 
     asyncio.ensure_future(app.spectrometer_loop())
 
-    return lambda: web.run_app(app, port = 4000)
+    return lambda: web.run_app(app, host = args.bind, port = 4000)
 
 if __name__ == "__main__":
     fn = asyncio.get_event_loop().run_until_complete(main())
