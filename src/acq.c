@@ -75,8 +75,15 @@ void dma1_channel2_isr(void)
 				acq_channel.pulse = false;
 				if (acq_channel.rthresh == 0 ||
 						(acq_channel.rthresh != 0 && acq_channel.falling > acq_channel.rthresh)) {
-					if (!acq_channel.mute)
+					// A somewhat ad-hoc fix for too many events
+					// spamming the output FIFO, preventing commands
+					// from going through.
+					// Eventually, it would be much better to have two separate
+					// FIFOs, one low-priority for events and second
+					// higher priority one for command responses
+					if (event_count < 100) {
 						comm_send_event(acq_channel.max);
+					}
 					event_count++;
 				}
 			} else {
@@ -98,11 +105,6 @@ void dma1_channel2_isr(void)
 
 	isr_count++;
 	if (isr_count > 300) {
-		acq_channel.mute = event_count > 100;
-		if (!acq_channel.mute)
-			led_toggle();
-		else
-			led_on();
 		isr_count = 0;
 		event_count = 0;
 	}
