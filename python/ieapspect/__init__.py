@@ -29,7 +29,7 @@ import operator
 import random
 import re
 import serial
-import serial.aio
+import serial_asyncio
 import struct
 import subprocess
 import sys
@@ -127,7 +127,7 @@ class AsyncSerialSpectrometer(Spectrometer, asyncio.Protocol):
             for s in list_ports.comports():
                 if re.match(cls._description, s.description):
                     port = s.device
-        transport, spect = await serial.aio.create_serial_connection(
+        transport, spect = await serial_asyncio.create_serial_connection(
                                 asyncio.get_event_loop(), cls, port, cls._initbaud)
         await spect._initsem.acquire()
         await spect._ainit()
