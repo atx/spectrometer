@@ -40,7 +40,7 @@ class Client:
         self.master = master
 
     def send(self, jsn):
-        self.ws.send_str(json.dumps(jsn))
+        asyncio.ensure_future(self.ws.send_json(jsn))
 
     def send_history(self, hist, since):
         self.send({"h": hist, "since": since})
@@ -65,8 +65,8 @@ class Client:
         await self.send_configprops()
 
         async for msg in self.ws:
-            if msg.tp == web.MsgType.text:
-                js = json.loads(msg.data)
+            if msg.type == web.WSMsgType.text:
+                js = msg.json()
                 if js["command"] == "clear":
                     self.master.clear()
                 elif js["command"] == "set":
@@ -79,8 +79,6 @@ class Client:
                         continue
                     self.master.spectrometer.set_prop(js["id"], js["value"])
                     await self.master.broadcast_configprops()
-            elif msg.tp == web.MsgType.close:
-                break
 
 
 class WebApp(web.Application):
