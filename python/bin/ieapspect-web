@@ -211,7 +211,7 @@ async def main():
     THRESHOLD = 50
 
     if args.type == "dummy":
-        spectrometer = DummySpect(period=0.001, chans=4096)
+        spectrometer = DummySpect(period=0.001, channels=4096)
     elif args.type == "serial":
         spectrometer = await SerSpect.connect(args.serial)
         spectrometer.set_prop(SerSpect.PROP_THRESH, THRESHOLD)
