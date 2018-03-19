@@ -323,7 +323,7 @@ function initRemote(data) {
 
 	state.ws = new WebSocket("ws://" + location.hostname + ":" + location.port + "/ws");
 	state.ws.onopen = function() {
-		state.ws.send(JSON.stringify({"csrf": data["csrf"]}));
+		console.log("WebSocket connection opened")
 	}
 	state.ws.onmessage = function(msg) {
 		var d = $.parseJSON(msg.data);

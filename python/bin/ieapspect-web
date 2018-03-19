@@ -27,8 +27,11 @@ import base64
 import datetime
 import json
 import os
-import time
 import pkg_resources
+import time
+import urllib.parse
+import logging as log
+
 from aiohttp import web
 from ieapspect import DummySpect, SIPOSSpect, SerSpect
 
@@ -55,12 +58,6 @@ class Client:
         self.send({"props": dpr})
 
     async def run(self):
-        js = json.loads(await self.ws.receive_str())
-        if self.master.csrf_token != js["csrf"]:
-            # EVIL
-            print("Invalid CSRF token detected!")
-            return
-
         self.send_history(self.master.history, self.master.since)
         await self.send_configprops()
 
@@ -79,31 +76,35 @@ class Client:
                         continue
                     self.master.spectrometer.set_prop(js["id"], js["value"])
                     await self.master.broadcast_configprops()
+            else:
+                print(msg)
 
 
 class WebApp(web.Application):
 
-    def __init__(self, spectrometer, logfile=None):
-        super(WebApp, self).__init__()
+    def __init__(self, spectrometer, hostnames=[], logfile=None):
+        super(WebApp, self).__init__(middlewares=[self._csrf_filter_middleware])
 
         self.spectrometer = spectrometer
+        self.hostnames = list(hostnames)
         self.logfile = logfile
         self.clients = []
         self.history = [0] * self.spectrometer.channels
         self.since = time.time()
 
-        self.csrf_token = base64.b64encode(os.urandom(20)).decode()
-
         # WebSockets are not constrained by Same-Origin policy, this gets sent by the
         # client to configure and authenticate itself.
-        metadata = {"csrf": self.csrf_token,
-                    "channels": self.spectrometer.channels,
-                    "driver": self.spectrometer.__class__.__name__,
-                    "fw_version": self.spectrometer.fw_version,
-                    "configprops": [{"id": c.id,
-                                     "name": c.name,
-                                     "from": c.fr,
-                                     "to": c.to} for c in self.spectrometer.configprops]}
+        metadata = {
+            "channels": self.spectrometer.channels,
+            "driver": self.spectrometer.__class__.__name__,
+            "fw_version": self.spectrometer.fw_version,
+            "configprops": [{
+                "id": c.id,
+                "name": c.name,
+                "from": c.fr,
+                "to": c.to
+            } for c in self.spectrometer.configprops]
+        }
 
         self.metadata_json = json.dumps(metadata).encode()
 
@@ -112,6 +113,23 @@ class WebApp(web.Application):
         self.router.add_route("GET", "/", self.handle_index)
         self.router.add_route("GET", "/ws", self.handle_ws)
         self.router.add_static("/", pkg_resources.resource_filename("ieapspect.web", ""))
+
+    @web.middleware
+    async def _csrf_filter_middleware(self, request, handler):
+        origin = request.headers.get("Origin")
+        host = request.headers.get("Host")
+        # Note that this isn't 100% against CSRF POSTs, we don't have any of
+        # these at the moment, this is just an extra layer
+        if origin is not None and urllib.parse.urlparse(origin).netloc != host:
+            log.error("Origin header does not match Host header ('{}' != '{}')"
+                      .format(request.headers["Origin"], request.headers["Host"]))
+            return web.HTTPForbidden()
+        if not any(host == pat or pat == "*" for pat in self.hostnames):
+            log.error("Host header does not match our whitelist ('{}' not in {})"
+                      .format(host, self.hostnames))
+            return web.HTTPForbidden()
+
+        return await handler(request)
 
     async def handle_metadata(self, req):
         return web.Response(body=self.metadata_json, content_type="application/json")
@@ -179,8 +197,8 @@ class WebApp(web.Application):
         for c in self.clients:
             c.send({"props": dpr})
 
-async def main():
 
+async def main():
     parser = argparse.ArgumentParser(
         prog="Spectrometer GUI"
     )
@@ -203,8 +221,24 @@ async def main():
         "-l", "--log",
         help="Log timestamped events into a file",
     )
-
+    parser.add_argument(
+        "-o", "--hostname",
+        nargs="+",
+        default=["localhost:4000", "127.0.0.1:4000"],
+        help="Allowed HTTP hostnames ('*' for any)"
+    )
+    parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Verbose logging"
+    )
     args = parser.parse_args()
+
+    log.basicConfig(
+        level=(log.DEBUG if args.verbose else log.INFO),
+        format="%(asctime)s %(levelname)s: %(message)s",
+        datefmt="%Y-%m-%dT%H:%M",
+    )
 
     THRESHOLD = 50
 
@@ -219,7 +253,7 @@ async def main():
     elif args.type == "sipos":
         spectrometer = await SIPOSSpect.connect(args.serial)
 
-    app = WebApp(spectrometer, logfile=args.log)
+    app = WebApp(spectrometer, hostnames=args.hostname, logfile=args.log)
 
     asyncio.ensure_future(app.spectrometer_loop())
 
