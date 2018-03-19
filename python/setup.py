@@ -21,8 +21,8 @@ setup(
     include_package_data=True,
     scripts=["bin/ieapspect-cpm", "bin/ieapspect-filedump", "bin/ieapspect-web",
              "bin/ieapspect-dm100", "bin/ieapspect-spectrig", "bin/ieapspect-simplegui"],
-    data_files=[("bin", ["wrappers/ieapspect-wrapper-" + f
-                         for f in ["dm100", "spectrig"]])],
+    #data_files=[("bin", ["wrappers/ieapspect-wrapper-" + f
+    #                     for f in ["dm100", "spectrig"]])],
     description="Python library for some of the spectrometers developed at the IEAP",
     author="Josef Gajdusek",
     author_email="atx@atx.name",
@@ -34,6 +34,6 @@ setup(
         "Intended Audience :: Developers",
         "License :: OSI Approved :: MIT License",
         "Topic :: Utilities",
-    ],
-    cmdclass={"install": WrapperInstall}
+    ]
+    #cmdclass={"install": WrapperInstall}
 )
