@@ -1,0 +1,8 @@
+Source: python3-ieapspect
+Maintainer: Josef Gajdusek <atx@atx.name>
+Build-Depends: debhelper (>= 9), python3-all, python3-setuptools
+
+Package: python3-ieapspect
+Architecture: all
+Description: Python spectrometer library
+Depends: python3-all, python3-serial, python3-aiohttp

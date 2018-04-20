@@ -40,3 +40,10 @@ __pycache__
 
 # clang compilation database
 compile_commands.json
+
+# Debian package files
+*.dsc
+*.tar.gz
+*.deb
+*.buildinfo
+*.changes

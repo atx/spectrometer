@@ -1,0 +1,5 @@
+python3-ieapspect (0.1) UNRELEASED; urgency=medium
+
+  * Initial Debian package
+
+ -- Josef Gajdusek <atx@atx.name>  Fri, 20 Apr 2018 09:14:00 +0200
