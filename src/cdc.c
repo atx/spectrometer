@@ -324,6 +324,13 @@ int cdc_send(char *buf, int len)
 	return len;
 }
 
+int cdc_respond(char *buf, int len)
+{
+	usbd_ep_write_packet(usbd_dev, EP_TX, buf,
+						 min(TX_MAX_PACKET, len));
+	return len;
+}
+
 inline static void cdc_pullup(bool to)
 {
 	if (to)

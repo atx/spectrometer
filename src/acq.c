@@ -61,8 +61,6 @@ inline static void led_toggle()
 RAMFUNC
 void dma1_channel2_isr(void)
 {
-	static int isr_count = 0;
-	static int event_count = 0;
 	int off = DMA1_ISR & DMA_ISR_HTIF2 ? 0 : BUFFER_SIZE / 2 ;
 	uint16_t data;
 
@@ -75,16 +73,7 @@ void dma1_channel2_isr(void)
 				acq_channel.pulse = false;
 				if (acq_channel.rthresh == 0 ||
 						(acq_channel.rthresh != 0 && acq_channel.falling > acq_channel.rthresh)) {
-					// A somewhat ad-hoc fix for too many events
-					// spamming the output FIFO, preventing commands
-					// from going through.
-					// Eventually, it would be much better to have two separate
-					// FIFOs, one low-priority for events and second
-					// higher priority one for command responses
-					if (event_count < 100) {
-						comm_send_event(acq_channel.max);
-					}
-					event_count++;
+					comm_send_event(acq_channel.max);
 				}
 			} else {
 				if (data > acq_channel.max) {
@@ -101,12 +90,6 @@ void dma1_channel2_isr(void)
 				acq_channel.pulse = true;
 			}
 		}
-	}
-
-	isr_count++;
-	if (isr_count > 300) {
-		isr_count = 0;
-		event_count = 0;
 	}
 }
 

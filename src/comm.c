@@ -54,14 +54,11 @@ enum error {
 	EINOP		= 3,
 };
 
-uint32_t comm_missed = 0;
+uint32_t comm_event_missed = 0;
 
 static inline void comm_send(char *buf, size_t len, bool flush)
 {
-	if (!cdc_send(buf, len))
-		comm_missed++;
-	else if (flush)
-		cdc_flush();
+	cdc_respond(buf, len);
 }
 
 static inline void comm_send_error(enum error errno)
@@ -73,7 +70,8 @@ static inline void comm_send_error(enum error errno)
 void comm_send_event(uint16_t val)
 {
 	char p[] = { PACKET_EVENT, LOBYTE(val), HIBYTE(val) };
-	comm_send(p, sizeof(p), false);
+	if (!cdc_send(p, sizeof(p)))
+		comm_event_missed++;
 }
 
 void comm_send_wave(uint16_t *vals, int len)

@@ -19,6 +19,7 @@
 #define CDC_H
 
 int cdc_send(char *buf, int len);
+int cdc_respond(char *buf, int len);
 void cdc_init();
 void cdc_flush();
 
